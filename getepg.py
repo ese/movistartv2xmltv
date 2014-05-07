@@ -3,12 +3,45 @@
 import socket
 import struct
 import re
-import pprint
 import sys
-import binascii
-import datetime
-import itertools
+#import pprint
+#import binascii
+#import datetime
+#import itertools
+from BeautifulSoup import BeautifulSoup as Soup
+import xml.etree.ElementTree as ET
 
+
+MCAST_GRP_START = '239.0.2.129'
+MCAST_PORT = 3937
+
+def getxmlfile(MCAST_GRP,MCAST_PORT,DISCNAME):
+	xmldata=""
+	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+	sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+	sock.settimeout(3)
+	sock.bind(('', MCAST_PORT))
+	mreq = struct.pack("=4sl", socket.inet_aton(MCAST_GRP), socket.INADDR_ANY)
+	sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+	while True:
+		data = sock.recv(1500)
+		start = data.find("<?xml")
+		if(start!=-1):
+			isourservice=data.find(DISCNAME)
+			if(isourservice!=-1):
+				xmldata+=data[start:]
+				#print data[start:],
+				while True:
+					data = sock.recv(1500)
+					start = data.find("</ServiceDiscovery>")
+					if(start!=-1):
+						xmldata+=data[12:start+19]
+						#print data[13:start+19],
+						return(xmldata)
+					else:
+						xmldata+=data[12:]
+					#print data[13:],
+				
 
 if len(sys.argv) < 2:
 	print "USO: imagenio.py TUPROVINCIA"
@@ -34,80 +67,26 @@ if len(sys.argv) < 2:
 
 provincia=sys.argv[1]
 
-###################################################
-MCAST_GRP = '239.0.2.129'
-###################################################
+# conseguir la ip de servicio de la provincia
+xmlfile=getxmlfile(MCAST_GRP_START,MCAST_PORT,'ServiceProviderDiscovery')
+regexp = re.compile("DEM_" + str(provincia) +  "\..*?Address\=\\\"(.*?)\\\".*?",re.DOTALL)
+ipprovincia = regexp.findall(xmlfile)[0]
 
-MCAST_PORT = 3937
-principio=0
-final=0
-ipprovincia=0
+# conseguir la lista de canales
+xmlfile=getxmlfile(ipprovincia,MCAST_PORT,'BroadcastDiscovery')
 
-#print "Buscando IP del servidor Multicast de MovistarTV..."
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+#soup = Soup(Soup(xmlfile).prettify())
+#print soup
+#soup=Soup(xmlfile)
 
-sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-sock.settimeout(3)
-sock.bind(('', MCAST_PORT))
-mreq = struct.pack("=4sl", socket.inet_aton(MCAST_GRP), socket.INADDR_ANY)
-
-sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-
-while True:	
-	d = sock.recv(80960000)
-	regexp = re.compile("DEM_" + str(provincia) +  "\..*?Address\=\\\"(.*?)\\\".*?",re.DOTALL)
-	m = regexp.findall(d)
-
-	if(re.findall("\<\?xml", d)):
-		principio=1
-	if(principio==1):
-		if(re.findall("</ServiceDiscovery>",d)):
-			final=1		
-		if(final==1):
-			if m:
-				print m[0]
-				ipprovincia = m[0]
-				print "IP Encontrada!"
-				break
-				
-			#print "final"
-			
-principio=0
-final=0
-
-#A PARTIR DE AQUI MEJOR NO TOQUES NADA SI NO SABES
-
-###################################################
-MCAST_GRP = ipprovincia
-###################################################
-
-MCAST_PORT = 3937
-
-#print "Obteniendo datos del servidor Multicast de MovistarTV..."
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-
-sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-sock.settimeout(3)
-sock.bind(('', MCAST_PORT))
-mreq = struct.pack("=4sl", socket.inet_aton(MCAST_GRP), socket.INADDR_ANY)
-
-sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+#channel= soup.findAll('singleservice')
+#print channel
+#for channel in  soup.findAll('singleservice'):
+#	print channel
+root = ET.fromstring(xmlfile)
 
 
-lista=[]
+for child in root.findall(".//{urn:dvb:ipisdns:2006}ServiceDiscovery"):
+	print child.tag
+	print child.attrib
 
-while True:
-	
-	data = sock.recv(1500)
-	start = data.find("<?xml")
-	print start
-	if(start>0):
-		print data[start:],
-		while True:
-			data = sock.recv(1500)
-			start = data.find("</ServiceDiscovery>")
-			if(start>0):
-				print data[:start+19],
-				exit()
-			else:
-				print data[13:],
