@@ -31,7 +31,9 @@ def getrawstream(MCAST_GRP,MCAST_PORT,packets):
 	
 
 def getxmlfile(MCAST_GRP,MCAST_PORT,DISCNAME,ENDSTRING):
+	# DISCNAME = xml tag that identifies the file
 	# If DISCNAME="" then gets the first file
+	# ENDSTRIG= string that ends a file
 	xmldata=""
 	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
 	sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
