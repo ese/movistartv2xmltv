@@ -8,7 +8,7 @@ import sys
 #import binascii
 #import datetime
 #import itertools
-from BeautifulSoup import BeautifulSoup as Soup
+
 import xml.etree.ElementTree as ET
 
 
@@ -120,7 +120,7 @@ provincia=sys.argv[1]
 # conseguir la ip de servicio de la provincia
 xmlfile=getxmlfile(MCAST_GRP_START,MCAST_PORT,'ServiceProviderDiscovery',"</ServiceDiscovery>")
 regexp = re.compile("DEM_" + str(provincia) +  "\..*?Address\=\\\"(.*?)\\\".*?",re.DOTALL)
-# = regexp.findall(xmlfile)[0]
+ipprovincia = regexp.findall(xmlfile)[0]
 
 # conseguir la lista de canales
 xmlfile=getxmlfile(ipprovincia,MCAST_PORT,'BroadcastDiscovery','</ServiceDiscovery>')
