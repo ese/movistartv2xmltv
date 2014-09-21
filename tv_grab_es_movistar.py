@@ -38,6 +38,23 @@ MCAST_GRP_START = '239.0.2.129'
 MCAST_PORT = 3937
 MCAST_CHANNELS = '239.0.2.140'
 XMLTV_FILE = '/tmp/tv_grab_es_movistar.xmltv' 
+# Andalucia 15
+# Aragon    34
+# Asturias  13
+# Cantabria 29
+# Castilla# la# Mancha  38
+# Castilla# y# Leon 4
+# Cataluna  1
+# Comunidad# Valenciana 6
+# Extremadura   32
+# Galicia   24
+# Islas# Baleares   10
+# Islas# Canarias   37
+# La# Rioja 31
+# Madrid    19
+# Murcia    12
+# Navarra   35
+# Pais# Vasco   36
 PROVINCE = '19'
 ENCODING_EPG = 'utf-8'
 DECODING_EPG = 'latin1'
@@ -323,8 +340,8 @@ def getxmlsepg(MCAST_GRP,MCAST_PORT,files):
                     description = s.split('"description":"')[1].split('","')[0] #.decode(DECODING_EPG,'xmlcharrefreplace').encode(ENCODING_EPG,'xmlcharrefreplace') # Description
                     s = strProgramme[:]
                     subgenre =  s.split('"subgenre":"')[1].split('","')[0] #.encode(ENCODING_EPG) # Subgenre
-                    print "\n" + title + " / " + startTime + " / " + duration + " / " +  year  + " / " + genre   + " / " + subgenre  + " / " + str(episode) + " / " + str(season)
-                    #print description
+#                    print "\n" + title + " / " + startTime + " / " + duration + " / " +  year  + " / " + genre   + " / " + subgenre  + " / " + str(episode) + " / " + str(season)
+                    print title
 
                     programme = {}
                     if genre == subgenre:
@@ -341,8 +358,12 @@ def getxmlsepg(MCAST_GRP,MCAST_PORT,files):
                     programme['channel'] = str(fileid) + ".imagenio.es"
                     programme['length'] = {'units': 'minutes', 'length': duration}
 #                    programme['language'] = ('Spanish')
-                    w.addProgramme(programme)
-                    w.write(XMLTV_FILE)
+                    try:
+                        w.addProgramme(programme)
+                        w.write(XMLTV_FILE)
+                    except ValueError:
+                        print "Some problem when adding:"
+                        print programme
 
                 # Si el fileid es el mismo que detectamos al beginning acabamos con el bucle.
                 if (fileid == lastfile):
