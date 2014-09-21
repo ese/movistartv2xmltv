@@ -274,8 +274,11 @@ def getxmlsepg(MCAST_GRP,MCAST_PORT,files):
                 file.close()
                 #print("File written")
 
-                tree = ET.parse('/tmp/programme.xml')
-                root = tree.getroot()
+                try:
+                    tree = ET.parse('/tmp/programme.xml')
+                    root = tree.getroot()
+                except ValueError:
+                    break
 
                 for child in root[0][0][0]:
                     if child[0].get('crid') is not None:
