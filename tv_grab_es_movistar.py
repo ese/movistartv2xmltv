@@ -25,6 +25,7 @@ from datetime import timedelta
 # XML
 import urllib
 import xml.etree.ElementTree as ET
+from xml.etree.ElementTree import Element, SubElement, Comment, ElementTree
 import pprint
 import binascii
 from pprint import pprint
@@ -37,7 +38,11 @@ reload(sys)
 MCAST_GRP_START = '239.0.2.129'
 MCAST_PORT = 3937
 MCAST_CHANNELS = '239.0.2.140'
-XMLTV_FILE = '/tmp/tv_grab_es_movistar.xmltv' 
+FILE_XML = '/tmp/tv_grab_es_movistar.xml' 
+FILE_M3U = '/tmp/tv_grab_es_movistar.m3u'
+FILE_LOG = '/tmp/tv_grab_es_movistar.log'
+
+
 # Andalucia 15
 # Aragon    34
 # Asturias  13
@@ -59,10 +64,14 @@ PROVINCE = '19'
 ENCODING_EPG = 'utf-8'
 DECODING_EPG = 'latin1'
 ENCODING_SYS = sys.getdefaultencoding()
-print "The default system encoding is : " + ENCODING_SYS
+#print "The default system encoding is : " + ENCODING_SYS
 sys.setdefaultencoding(ENCODING_EPG)
 #ENCODING_SYS = sys.getdefaultencoding()
 #print "The system encoding has been set to : " + ENCODING_SYS
+
+if os.path.isfile(FILE_LOG):
+    os.remove(FILE_LOG)
+fLog = open(FILE_LOG, 'w+')
 
 
 # Example, for debugging purpose only
@@ -142,7 +151,7 @@ def getxmlprovince(MCAST_GRP,MCAST_PORT,PROVINCE):
     return None
 
 
-def getxmlchannels(MCAST_GRP,MCAST_PORT):
+def getxmlchannels(MCAST_GRP,MCAST_PORT,OBJ_XMLTV,rootXmltv):
     beginning=0
     end=0
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -153,12 +162,7 @@ def getxmlchannels(MCAST_GRP,MCAST_PORT):
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
     lista=[]
     now = datetime.datetime.now()
-    w = xmltv.Writer(encoding=ENCODING_EPG,
-                       date=str(now.strftime("%Y%m%d%H%M%S"))+" +0200",
-                       source_info_url="https://go.tv.movistar.es/",
-                       source_info_name="Grabber for internal multicast of MovistarTV",
-                       generator_info_name="python-xmltv",
-                       generator_info_url="/usr/lib/python2.7/dist-packages/xmltv.py")
+    w = OBJ_XMLTV
 
     while (end == 0):
         d = sock.recv(8096000)
@@ -176,21 +180,20 @@ def getxmlchannels(MCAST_GRP,MCAST_PORT):
                 lista = list(itertools.chain(*lista))
                 lista.sort()
                 # M3U file
-                f = open('/root/tv_grab_es_movistar.m3u','a')
-                f.write("#EXTM3U\n")
+                if os.path.isfile(FILE_M3U):
+                    os.remove(FILE_M3U)
+                fM3u = open(FILE_M3U, 'w+')
+                fM3u.write("#EXTM3U\n")
                 for i in range(0,len(lista)-1):
                     #print "Grabbing " + lista[i][3]
                     # M3U file
-                    f.write("#EXTINF:-1," + lista[i][3] + ' [' + lista[i][2] + ']\n')
-                    f.write("rtp://@" + lista[i][1] + ":" + str(lista[i][0]) + '\n')
+                    fM3u.write("#EXTINF:-1," + lista[i][3] + ' [' + lista[i][2] + ']\n')
+                    fM3u.write("rtp://@" + lista[i][1] + ":" + str(lista[i][0]) + '\n')
                     # XMLTV file
-                    channel = {}
-                    channel['display-name'] = [(lista[i][3], 'es')]
-                    channel['id'] = lista[i][2]+ ".imagenio.es"
-    #                channel['url'] = ['https://go.tv.movistar.es']
-                    w.addChannel(channel)
-                w.write(XMLTV_FILE)
-    return w
+                    cChannel = SubElement(rootXmltv,'channel',{"id": lista[i][2]+ ".imagenio.es"})
+                    cName = SubElement(cChannel, "display-name", {"lang":"es"})
+                    cName.text = lista[i][3]
+    return rootXmltv
 
 
 def getrawstream(MCAST_GRP,MCAST_PORT,packets):
@@ -207,11 +210,8 @@ def getrawstream(MCAST_GRP,MCAST_PORT,packets):
 		packets-=1
 	return xmldata
 
-def getxmlsepg(MCAST_GRP,MCAST_PORT,files):
-        try:
-                os.stat(MCAST_GRP)
-        except:
-                os.mkdir(MCAST_GRP)
+def getxmlepg(MCAST_GRP,MCAST_PORT,files,OBJ_XMLTV,rootXmltv):
+        w = OBJ_XMLTV
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.settimeout(3)
@@ -220,13 +220,6 @@ def getxmlsepg(MCAST_GRP,MCAST_PORT,files):
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         end = 0
         now = datetime.datetime.now() 
-        w = xmltv.Writer(encoding=ENCODING_EPG,
-                   date=str(now.strftime("%Y%m%d%H%M%S"))+" +0200",
-                   source_info_url="https://go.tv.movistar.es/",
-                   source_info_name="Grabber for internal multicast of MovistarTV",
-                   generator_info_name="python-xmltv",
-                   generator_info_url="/usr/lib/python2.7/dist-packages/xmltv.py")
-
         #Esperamos al end de una secuencia para comenzar por el beginning de un fichero
         while not (end):
             data = sock.recv(1500)
@@ -269,31 +262,40 @@ def getxmlsepg(MCAST_GRP,MCAST_PORT,files):
                 xmldata+=body[:-4]
 #                file = open(MCAST_GRP+"/"+str(fileid)+".xml", "w")
                 # Keeping the file for dubugging. TODO: no file, just we use the XML tree in memmory
-                file = open("/tmp/programme.xml", "w")
+                file = open("/tmp/programme.xml", "w+")
                 file.write(xmldata)
                 file.close()
                 #print("File written")
 
                 try:
                     tree = ET.parse('/tmp/programme.xml')
-                    root = tree.getroot()
-                except ValueError:
+                except ET.ParseError, v:
+                    row, column = v.position
+                    fLog.write("\nError when opening /tmp/programme.xml\n")
+                    fLog.write(str(ET.ParseError))
+                    fLog.write("\nerror on row" + str(row) + "column" + str(column) + ":" + str(v) + "\n")
                     break
+                root = tree.getroot()
+
+                if root[0][0][0].get('serviceIDRef') is not None:
+                    channelid = root[0][0][0].get('serviceIDRef') 
 
                 for child in root[0][0][0]:
+                    programme = {}
                     if child[0].get('crid') is not None:
                         programmeId = child[0].get('crid').split('/')[5]   # id for description
                     if child[1][1][0] is not None:
-                        genre =  child[1][1][0].text.encode(ENCODING_EPG).replace('\n', ' ') # Genre
+                        genre =  child[1][1][0].text #.encode(ENCODING_EPG).replace('\n', ' ') # Genre
                     #   20030702000000 XMLTV format
                     #   YYYYMMddHHmmss
                     #   2014-09-21T22:24:00.000Z IPTV multicast format
                     #   YYYY-MM-ddTHH:mm:ss.000Z
                     if child[2] is not None:
-                        startTimeXml = child[2].text.encode(ENCODING_EPG).replace('\n', ' ').replace('.000Z', '').replace('T', ' ') # Start time
+                        startTimeXml = child[2].text.replace('\n', ' ').replace('.000Z', '').replace('T', ' ') # Start time
                         startTimePy = datetime.datetime.strptime(startTimeXml,'%Y-%m-%d %H:%M:%S')
                         startTime = startTimePy.strftime('%Y%m%d%H%M%S') 
-                    durationXml = child[3].text.encode(ENCODING_EPG).replace('\n', ' ').replace('PT','') # Duration
+
+                    durationXml = child[3].text.replace('\n', ' ').replace('PT','') # Duration
                     if durationXml.find('H') > 0 and durationXml.find('M') > 0:
                         durationPy = datetime.datetime.strptime(durationXml,'%HH%MM')
                     elif durationXml.find('H') > 0 and durationXml.find('M') < 0:
@@ -304,15 +306,12 @@ def getxmlsepg(MCAST_GRP,MCAST_PORT,files):
                         durationPy = None
 
                     durationPy = 60 * int(durationPy.strftime('%H')) + int(durationPy.strftime('%M'))
-                    duration = str(durationPy).encode(ENCODING_EPG) # Duration or length
+                    duration = str(durationPy)#.encode(ENCODING_EPG) # Duration or length
                     stopTimePy = startTimePy + timedelta(minutes=durationPy)
-                    stopTime = stopTimePy.strftime('%Y%m%d%H%M%S').encode(ENCODING_EPG) # Stop time
-
+                    stopTime = stopTimePy.strftime('%Y%m%d%H%M%S')#.encode(ENCODING_EPG) # Stop time
 
                     url ='http://www-60.svc.imagenio.telefonica.net:2001/appserver/mvtv.do?action=getEpgInfo&extInfoID='+ programmeId +'&tvWholesaler=1'
-#                    strProgramme = urllib.urlopen(url).read().replace('\n','').decode(DECODING_EPG).replace('\xc2','').replace('\xc3','').replace('\xa7','').encode(ENCODING_EPG) #.encode(ENCODING)
-                    strProgramme = urllib.urlopen(url).read().replace('\n','').decode(DECODING_EPG).encode(ENCODING_EPG)
-#                    strProgramme = urllib.urlopen(url).read().replace('\n','').decode(DECODING_EPG,'xmlcharrefreplace').encode(ENCODING_EPG,'xmlcharrefreplace')
+                    strProgramme = urllib.urlopen(url).read().replace('\n',' ') #.decode(DECODING_EPG).encode(ENCODING_EPG)
                     #   Genre can be also got from the extra information
                     #    s = strProgramme[:]
                     #    genre = s.split('"genre":"')[1].split('","')[0] # Genre
@@ -322,10 +321,11 @@ def getxmlsepg(MCAST_GRP,MCAST_PORT,files):
                     else:
                         year = None
                     s = strProgramme[:]
-                    fullTitle = child[1][0].text.encode(ENCODING_EPG)
+                    fullTitle = child[1][0].text #.encode(ENCODING_EPG)
 
-                    s = fullTitle[:].replace('\n','')
+                    s = fullTitle[:].replace('\n',' ')
                     m = re.search(r"(.*?) T(\d+) Cap. (\d+)", s)
+                    title = ""
                     if m:
                         title = m.group(1) # title
                         season = m.group(2) # season
@@ -335,43 +335,53 @@ def getxmlsepg(MCAST_GRP,MCAST_PORT,files):
                         season = 0
                         title = s.split(': Episodio ')[0] # Title
                     else:
-                        episode = 0
-                        season = 0
+                        episode = None
+                        season = None
                         title = fullTitle[:]
-                    title = title.replace('\n',' ')
-                    s = strProgramme[:]
-                    description = s.split('"description":"')[1].split('","')[0] #.decode(DECODING_EPG,'xmlcharrefreplace').encode(ENCODING_EPG,'xmlcharrefreplace') # Description
-                    s = strProgramme[:]
-                    subgenre =  s.split('"subgenre":"')[1].split('","')[0] #.encode(ENCODING_EPG) # Subgenre
-#                    print "\n" + title + " / " + startTime + " / " + duration + " / " +  year  + " / " + genre   + " / " + subgenre  + " / " + str(episode) + " / " + str(season)
-                    print title
+#                    title = child[1][0].text #.encode(ENCODING_EPG)
 
-                    programme = {}
-                    if genre == subgenre:
-                        programme['category'] = [(subgenre)]
-                    else: 
-                        programme['category'] = [(genre, subgenre)]
-                    programme['date'] = year 
-                    programme['start'] = startTime 
-                    programme['stop'] = stopTime
-                    programme['title'] = [(title)]
-                    programme['desc'] = [(description + ".")]
-                    if episode != 0:
-                        programme['episode-num'] = (str(season) + " . " + str(episode), 'xmltv_ns')
-                    programme['channel'] = str(fileid) + ".imagenio.es"
+                    if len(title) < 3:
+                        fLog.write("\nToo short title: " + s + " / " + title +"\n")
+                        break
+                    title = title.replace('\n',' ').encode(ENCODING_EPG)
+                    s = strProgramme[:]
+                    if s.find('"description":"')>0:
+                        description = s.split('"description":"')[1].split('","')[0] #.decode(DECODING_EPG,'xmlcharrefreplace').encode(ENCODING_EPG,'xmlcharrefreplace') # Description
+ 
+                    s = strProgramme[:]
+                    if s.find('"subgenre":"')>0:
+                        subgenre =  s.split('"subgenre":"')[1].split('","')[0] #.encode(ENCODING_EPG) # Subgenre
+
+                    programme['date'] = year
                     programme['length'] = {'units': 'minutes', 'length': duration}
-#                    programme['language'] = ('Spanish')
-                    try:
-                        w.addProgramme(programme)
-                        w.write(XMLTV_FILE)
-                    except ValueError:
-                        print "Some problem when adding:"
-                        print programme
+                    # Creating XMLTV with XML libraries instead XMLTV
+                    cProgramme = SubElement(rootXmltv,'programme', {"start":startTime+" +0200", "stop": stopTime+" +0200", "channel":channelid})
+                    cTitle = SubElement(cProgramme, "title", {"lang":"es"})
+                    cTitle.text = title.encode(ENCODING_EPG)
+                    cDesc = SubElement(cProgramme, "desc", {"lang":"es"})
+                    cDesc.text = description.encode(ENCODING_EPG)
+                    cCategory = SubElement(cProgramme, "category", {"lang":"es"})
+                    if len(genre) < 2:
+                        fLog.write("\nToo short genre: " + genre +"\n")
+                        fLog.write(str(strProgramme))
+                        if genre == subgenre:
+                            cCategory.text = subgenre
+                        else:
+                            cCategory.text = genre +", "+subgenre
+                    if episode is not None:
+                        cEpisode = SubElement(cProgramme, "episode-num")
+                        cEpisode.text = "."+episode.encode(ENCODING_EPG)+"."
+                    elif season is not None:
+                        cEpisode = SubElement(cProgramme, "episode-num")
+                        cEpisode.text = season.encode(ENCODING_EPG)+"."+episode.encode(ENCODING_EPG)+"."
+                    if len(duration) > 0:
+                        cDuration = SubElement(cProgramme, "length")
+                        cDuration.text = duration.encode(ENCODING_EPG)
+
 
                 # Si el fileid es el mismo que detectamos al beginning acabamos con el bucle.
                 if (fileid == lastfile):
                     files = 1
-#                    w.write('/root/tv_grab_es_movistar.xmltv')
                 files-=1
         sock.close()
 
@@ -442,22 +452,38 @@ def parseepgservicesxml(xmldata):
 
 # Main starts
 # TO-DO: Adding 7th day for EPG
-if not open(XMLTV_FILE, 'a'):
-    os.remove(XMLTV_FILE)
+
 #print "Looking for the ip of your province"
 #ipprovince = getxmlprovince(MCAST_CHANNELS,MCAST_PORT,PROVINCE)
-#print "Getting channels list"
-#getxmlchannels(ipprovince,MCAST_PORT)
-#getxmlchannels(MCAST_CHANNELS,MCAST_PORT)
+fLog.write("\nGetting channels list\n")
+now = datetime.datetime.now()
+w = xmltv.Writer(encoding=ENCODING_EPG,
+                       date=str(now.strftime("%Y%m%d%H%M%S"))+" +0200",
+                       source_info_url="https://go.tv.movistar.es/",
+                       source_info_name="Grabber for internal multicast of MovistarTV",
+                       generator_info_name="python-xmltv",
+                       generator_info_url="/usr/lib/python2.7/dist-packages/xmltv.py")
 
-#for i in range(133,138):
-for i in range(137,138):
-    print "Reading day " + str(i - 132)
-    getxmlsepg('239.0.2.'+str(i),MCAST_PORT,260)
+#if os.path.isfile(FILE_XML):
+#    tree = ET.parse(FILE_XML)
+#    root = ET.fromstring("tv")
+#    rootXmltv = tree.getroot()
+#else:
+rootXmltv = ET.Element("tv")
+getxmlchannels(MCAST_CHANNELS,MCAST_PORT,w,rootXmltv)
 
-    # A standard grabber should print the xmltv file to the stdout
-    f = open(XMLTV_FILE, 'r')
-    print f.read()
-    f.close()
+for i in range(130,138):
+#for i in range(137,138):
+    fLog.write("\nReading day " + str(i - 132) +"\n")
+    getxmlepg('239.0.2.'+str(i),MCAST_PORT,260,w,rootXmltv)
 
+# A standard grabber should print the xmltv file to the stdout
+ElementTree(rootXmltv).write(FILE_XML)
+
+#print fXmltv.read()
+fXml = open(FILE_XML, 'r')
+#print fXml.read()
+
+fXml.close()
+fLog.close()
 exit()
