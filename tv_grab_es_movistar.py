@@ -24,10 +24,15 @@ from tva import TvaStream, TvaParser
 logger = logging.getLogger('movistarxmltv')
 logger.setLevel(logging.DEBUG)
 fh = logging.FileHandler('/tmp/movistar.log')
-fh.setLevel(logging.DEBUG)
+fh.setLevel(logging.INFO)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
 fh.setFormatter(formatter)
 logger.addHandler(fh)
+logger.addHandler(ch)
 
 reload(sys)
 
@@ -69,7 +74,11 @@ sys.setdefaultencoding(ENCODING_EPG)
 
 if len(sys.argv) > 1:
 #    if str(sys.argv[1]) == "--description" or  str(sys.argv[1]) == "-d":
+    day = sys.argv[1]
+    FILE_XML = '/tmp/tv_grab_es_movistar_'+str(day)+'.xml'
     print "Spain (Multicast Movistar - py)"
+else:
+    print "Usage: "+ sys.argv[0]+' [DAY NUMBER(0 today)]'
     exit()
 
 
@@ -122,12 +131,11 @@ programmes = [{'audio': {'stereo': u'stereo'},
 
 #print "Looking for the ip of your province"
 #ipprovince = getxmlprovince(MCAST_CHANNELS,MCAST_PORT,PROVINCE)
-logger.info("\nGetting channels list\n")
+logger.info("Getting channels list")
 now = datetime.datetime.now()
 OBJ_XMLTV = ET.Element("tv" , {"date":now.strftime("%Y%m%d%H%M%S"),"source_info_url":"https://go.tv.movistar.es","source_info_name":"Grabber for internal multicast of MovistarTV","generator_info_name":"python-xml-parser","generator_info_url":"http://wiki.xmltv.org/index.php/XMLTVFormat"})
 #OBJ_XMLTV = ET.Element("tv" , {"date":now.strftime("%Y%m%d%H%M%S")+" +0200"})
 
-logger.info("Get channels stream")
 channelsstream = TvaStream(MCAST_CHANNELS,MCAST_PORT)
 channelsstream.getfiles()
 xmlchannels = channelsstream.files()[0]
@@ -142,14 +150,13 @@ fM3u = open(FILE_M3U, 'w+')
 fM3u.write(channelsm3u)
 fM3u.close
 
-for i in range(130,138):
-#for i in range(137,138):
-    logger.info("\nReading day " + str(i - 132) +"\n")
-    epgstream = TvaStream('239.0.2.'+str(i),MCAST_PORT)
-    epgstream.getfiles()
-    for i in epgstream.files().keys():
-        epgparser = TvaParser(epgstream.files()[i])
-        epgparser.parseepg(OBJ_XMLTV,channelparser.getchannelsdic())
+i=int(day)+132
+logger.info("\nReading day " + str(i - 132) +"\n")
+epgstream = TvaStream('239.0.2.'+str(i),MCAST_PORT)
+epgstream.getfiles()
+for i in epgstream.files().keys():
+    epgparser = TvaParser(epgstream.files()[i])
+    epgparser.parseepg(OBJ_XMLTV,channelparser.getchannelsdic())
 
 # A standard grabber should print the xmltv file to the stdout
 ElementTree(OBJ_XMLTV).write(FILE_XML)
