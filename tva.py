@@ -52,8 +52,9 @@ class TvaStream(object):
         while not (end):
             data = sock.recv(1500)
             end = struct.unpack('B',data[:1])[0]
+            filetype = struct.unpack('B',data[4:5])[0]
             fileid = struct.unpack('>H',data[5:7])[0]&0x0fff
-            firstfile = fileid
+            firstfile = str(filetype)+"_"+str(fileid)
 
         #Loop until firstfile
         while (loop):
@@ -61,12 +62,13 @@ class TvaStream(object):
                 data = sock.recv(1500)
 
                 #Struct of header - first 12 bytes
-                # end   xmlsize     ???   ?  id        chunk# *10   total chunks     \0
+                # end   xmlsize   type   ?  id        chunk# *10   total chunks     \0
                 # --   --------   -----  ------  ----  ---------  -------------      --
                 # 00   00 00 00    F1    X 0 00   00     00 00          00           00
                 #FIXME: XMLsize print is incorrect
                 end = struct.unpack('B',data[:1])[0]
                 size = struct.unpack('>HB',data[1:4])[0]
+                filetype = struct.unpack('B',data[4:5])[0]
                 fileid = struct.unpack('>H',data[5:7])[0]&0x0fff
                 chunk_number = struct.unpack('>H',data[8:10])[0]/0x10
                 chunk_total = struct.unpack('B',data[10:11])[0]
@@ -80,14 +82,15 @@ class TvaStream(object):
                         end = struct.unpack('B',data[:1])[0]
                         size = struct.unpack('>HB',data[1:4])[0]
                         fileid = struct.unpack('>H',data[5:7])[0]&0x0fff
+                        filetype = struct.unpack('B',data[4:5])[0]
                         chunk_number = struct.unpack('>H',data[8:10])[0]/0x10
                         chunk_total = struct.unpack('B',data[10:11])[0]
                         body=data[12:]
                 self.logger.debug("Chunk "+str(chunk_number)+"/"+str(chunk_total)+" ---- e:"+str(end)+" s:"+str(size)+" f:"+str(fileid))
                 #Discard last 4bytes binary footer?
                 xmldata+=body[:-4]
-                self._files[fileid]=xmldata
-                if (fileid == firstfile):
+                self._files[str(filetype)+"_"+str(fileid)]=xmldata
+                if (str(filetype)+"_"+str(fileid) == firstfile):
                     loop = False
         sock.close()
 

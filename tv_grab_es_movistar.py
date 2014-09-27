@@ -138,7 +138,7 @@ OBJ_XMLTV = ET.Element("tv" , {"date":now.strftime("%Y%m%d%H%M%S"),"source_info_
 
 channelsstream = TvaStream(MCAST_CHANNELS,MCAST_PORT)
 channelsstream.getfiles()
-xmlchannels = channelsstream.files()[0]
+xmlchannels = channelsstream.files()["2_0"]
 
 channelparser = TvaParser(xmlchannels)
 OBJ_XMLTV = channelparser.channels2xmltv(OBJ_XMLTV)
