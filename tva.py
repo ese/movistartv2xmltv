@@ -38,6 +38,26 @@ class TvaStream(object):
     def files(self):
         return self._files
 
+    def _getchunk(self,socket):
+        #Struct of header - first 12 bytes
+        # end   xmlsize   type   ?  id        chunk# *10   total chunks     \0
+        # --   --------   -----  ------  ----  ---------  -------------      --
+        # 00   00 00 00    F1    X 0 00   00     00 00          00           00
+        #FIXME: XMLsize print is incorrect
+        data = socket.recv(1500)
+        chunk = {}
+        chunk["end"] = struct.unpack('B',data[:1])[0]
+        chunk["size"] = struct.unpack('>HB',data[1:4])[0]
+        chunk["filetype"] = struct.unpack('B',data[4:5])[0]
+        chunk["fileid"] = struct.unpack('>H',data[5:7])[0]&0x0fff
+        chunk["chunk_number"] = struct.unpack('>H',data[8:10])[0]/0x10
+        chunk["chunk_total"] = struct.unpack('B',data[10:11])[0]
+        chunk["data"] = data[12:]
+        self.logger.debug("Chunk "+str(chunk["chunk_number"])+"/"+str(chunk["chunk_total"])+" ---- e:"+str(chunk["end"])+" s:"+        str(chunk["size"])+" f:"+str(chunk["fileid"]))
+        return chunk
+
+
+
     def getfiles(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -45,52 +65,28 @@ class TvaStream(object):
         sock.bind(('', self.mcast_port))
         mreq = struct.pack("=4sl", socket.inet_aton(self.mcast_grp), socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-        end = 0
         loop = True
+        chunk = {}
+        chunk["end"] = 0
 
         #Wait for an end chunk to start by the beginning
-        while not (end):
-            data = sock.recv(1500)
-            end = struct.unpack('B',data[:1])[0]
-            filetype = struct.unpack('B',data[4:5])[0]
-            fileid = struct.unpack('>H',data[5:7])[0]&0x0fff
-            firstfile = str(filetype)+"_"+str(fileid)
-
+        while not (chunk["end"]):
+            chunk = self._getchunk(sock)
+            firstfile = str(chunk["filetype"])+"_"+str(chunk["fileid"])
         #Loop until firstfile
         while (loop):
                 xmldata=""
-                data = sock.recv(1500)
-
-                #Struct of header - first 12 bytes
-                # end   xmlsize   type   ?  id        chunk# *10   total chunks     \0
-                # --   --------   -----  ------  ----  ---------  -------------      --
-                # 00   00 00 00    F1    X 0 00   00     00 00          00           00
-                #FIXME: XMLsize print is incorrect
-                end = struct.unpack('B',data[:1])[0]
-                size = struct.unpack('>HB',data[1:4])[0]
-                filetype = struct.unpack('B',data[4:5])[0]
-                fileid = struct.unpack('>H',data[5:7])[0]&0x0fff
-                chunk_number = struct.unpack('>H',data[8:10])[0]/0x10
-                chunk_total = struct.unpack('B',data[10:11])[0]
-
+                chunk = self._getchunk(sock)
                 #Discard headers
-                body=data[12:]
-                while not (end):
-                        self.logger.debug("Chunk "+str(chunk_number)+"/"+str(chunk_total)+" ---- e:"+str(end)+" s:"+str(size)+" f:"+str(fileid))
+                body=chunk["data"]
+                while not (chunk["end"]):
                         xmldata+=body
-                        data = sock.recv(1500)
-                        end = struct.unpack('B',data[:1])[0]
-                        size = struct.unpack('>HB',data[1:4])[0]
-                        fileid = struct.unpack('>H',data[5:7])[0]&0x0fff
-                        filetype = struct.unpack('B',data[4:5])[0]
-                        chunk_number = struct.unpack('>H',data[8:10])[0]/0x10
-                        chunk_total = struct.unpack('B',data[10:11])[0]
-                        body=data[12:]
-                self.logger.debug("Chunk "+str(chunk_number)+"/"+str(chunk_total)+" ---- e:"+str(end)+" s:"+str(size)+" f:"+str(fileid))
+                        chunk = self._getchunk(sock)
+                        body=chunk["data"]
                 #Discard last 4bytes binary footer?
                 xmldata+=body[:-4]
-                self._files[str(filetype)+"_"+str(fileid)]=xmldata
-                if (str(filetype)+"_"+str(fileid) == firstfile):
+                self._files[str(chunk["filetype"])+"_"+str(chunk["fileid"])]=xmldata
+                if (str(chunk["filetype"])+"_"+str(chunk["fileid"]) == firstfile):
                     loop = False
         sock.close()
 
