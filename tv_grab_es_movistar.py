@@ -155,6 +155,7 @@ logger.info("\nReading day " + str(i - 132) +"\n")
 epgstream = TvaStream('239.0.2.'+str(i),MCAST_PORT)
 epgstream.getfiles()
 for i in epgstream.files().keys():
+    logger.info("Parsing "+i)
     epgparser = TvaParser(epgstream.files()[i])
     epgparser.parseepg(OBJ_XMLTV,channelparser.getchannelsdic())
 
