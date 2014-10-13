@@ -5,6 +5,7 @@ import sys
 import os
 import itertools
 import logging
+import json
 
 # Networking
 import socket
@@ -12,6 +13,7 @@ from errno import EAGAIN
 
 # Time handling
 import time
+import pytz
 import datetime
 from datetime import timedelta
 
@@ -68,7 +70,7 @@ class TvaStream(object):
         loop = True
         chunk = {}
         chunk["end"] = 0
-
+	N = 335
         #Wait for an end chunk to start by the beginning
         while not (chunk["end"]):
             chunk = self._getchunk(sock)
@@ -86,7 +88,8 @@ class TvaStream(object):
                 #Discard last 4bytes binary footer?
                 xmldata+=body[:-4]
                 self._files[str(chunk["filetype"])+"_"+str(chunk["fileid"])]=xmldata
-                if (str(chunk["filetype"])+"_"+str(chunk["fileid"]) == firstfile):
+		N = N - 1
+                if (str(chunk["filetype"])+"_"+str(chunk["fileid"]) == firstfile or N == 0):
                     loop = False
         sock.close()
 
@@ -97,74 +100,76 @@ class TvaParser(object):
         self.xmldata = xmldata
         self.logger = logging.getLogger('movistarxmltv.tva.TvaParser')
 
-    def channellist(self):
-        beginning=0
-        end=0
-        lista=[]
-        now = datetime.datetime.now()
+    def channellist(self,clist):
+        root = ET.fromstring(self.xmldata)
+        services = root[0][0].findall("{urn:dvb:ipisdns:2006}SingleService")
+        for i in services:
+            channelid = i[1].attrib["ServiceName"]
+            clist[channelid] = {}
+            #clist[channelid]["logo"] = i[1].attrib["logoURI"]
+            url = "http://172.26.22.23:2001/appclient/incoming/epg/MAY_1/imSer/"+channelid+".jpg"
+            clist[channelid]["logo"] = url
+            clist[channelid]["address"] = i[0][0].attrib["Address"]
+            clist[channelid]["port"] = i[0][0].attrib["Port"]
+            clist[channelid]["name"] = i[2][0].text
+            clist[channelid]["shortname"] = i[2][1].text
+            clist[channelid]["desc"] = i[2][2].text
+            clist[channelid]["tags"] = i[2][3][0].text.split("/")
+        return clist
 
-        while (end == 0):
-            regexp = re.compile("Port\=\\\"(.*?)\\\".*?Address\=\\\"(.*?)\\\" \/\>.*?imSer\/(.*?)\.jpg.*?Language\=\\\"ENG\\\"\>(.*?)\<\/Name\>",      re.       DOTALL)
-            m = regexp.findall(self.xmldata)
-            if m:
-                lista.append(m)
+    def getpackages(self):
+      root = ET.fromstring(self.xmldata)
+      packages = root[0].findall("{urn:dvb:ipisdns:2006}Package")
+      packageslist = {}
+      for p in packages:
+        services =  p.findall("{urn:dvb:ipisdns:2006}Service")
+        package = p[0].text
+        packageslist[package] = {}
+        for s in services:
+          channelid = s[0].attrib["ServiceName"]
+          packageslist[package][channelid] = {}
+          packageslist[package][channelid]["order"] = s[1].text
+      return packageslist
 
-            if(re.findall("\<BroadcastDiscovery", self.xmldata)):
-                beginning=1
-
-            if(beginning==1):
-                if(re.findall("\<\/BroadcastDiscovery",self.xmldata)):
-                    end=1
-                    lista = list(itertools.chain(*lista))
-                    lista.sort()
-                    return lista
-
-    def channels2xmltv(self,xmltv):
-        lista = self.channellist()
-        for i in range(0,len(lista)-1):
-            channelName = lista[i][3]
-            channelId = lista[i][2]
-            channelKey = channelName.replace(" ","").encode(TvaParser.ENCODING_EPG)
-            channelIp = lista[i][1]
-            channelPort = str(lista[i][0])
+    def channels2xmltv(self,xmltv,clist):
+        for channelid in clist.keys():
+            channelName = clist[channelid]["name"]
+            channelId = channelid
+            channelKey = clist[channelid]["shortname"]
+            channelIp = clist[channelid]["address"]
+            channelPort = str(clist[channelid]["port"])
+            channelLogo = clist[channelid]["logo"]
             cChannel = SubElement(xmltv,'channel',{"id": channelName })
             cName = SubElement(cChannel, "display-name", {"lang":"es"})
+            cicon = SubElement(cChannel, "icon", {"src": channelLogo })
             cName.text = channelKey
         return xmltv
 
-    def channels2m3u(self):
-        lista = self.channellist()
+    def channels2m3u(self,clist):
         m3ucontent = "#EXTM3U\n"
-        for i in range(0,len(lista)-1):
-            channelName = lista[i][3]
-            channelId = lista[i][2]
-            channelKey = channelName.replace(" ","").encode(TvaParser.ENCODING_EPG)
-            channelIp = lista[i][1]
-            channelPort = str(lista[i][0])
-            #print "Grabbing " + lista[i][3]
-            # M3U file
-            m3ucontent += "#EXTINF:-1," + channelName + ' [' + channelId + ']\n'
+        for channelid in sorted(clist, key=lambda key: int(clist[key]["order"])):
+            channelName = clist[channelid]["name"]
+            channelId = channelid
+            channelKey = clist[channelid]["shortname"]
+            channelIp = clist[channelid]["address"]
+            channelPort = str(clist[channelid]["port"])
+            channelTags = clist[channelid]["tags"]
+            try:
+                channelOrder = clist[channelid]["order"]
+            except:
+                channelOrder = "99999"
+            channelLogo = clist[channelid]["logo"]
+            m3ucontent += "#EXTINF:-1," + channelOrder + ' - ' + channelName + '\n'
+            m3ucontent += "#EXTTV:"+','.join(channelTags)+";es;"+channelId+";"+channelLogo+'\n'
             m3ucontent += "rtp://@" + channelIp + ":" + channelPort + '\n'
         return m3ucontent
 
-    def getchannelsdic(self):
-        lista = self.channellist()
-        channels = {}
-        for i in range(0,len(lista)-1):
-             channelName = lista[i][3]
-             channelId = lista[i][2]
-             channelKey = channelName.replace(" ","").encode(TvaParser.ENCODING_EPG)
-             channelIp = lista[i][1]
-             channelPort = str(lista[i][0])
-             channels[channelId] = channelKey
-        return channels
-
-    def parseepg(self,xmltv,channels):
+    def parseepg(self,xmltv,clist):
         try:
             root = ET.fromstring(self.xmldata)
         except ET.ParseError, v:
             row, column = v.position
-            self.logger.info("\nError when opening /tmp/programme.xml, skipping...\n")
+            self.logger.info("\nError parsing xml, skipping...\n")
             self.logger.info(str(ET.ParseError))
             self.logger.info("\nerror on row" + str(row) + "column" + str(column) + ":" + str(v) + "\n")
         #root = tree.getroot()
@@ -188,8 +193,8 @@ class TvaParser(object):
             stopTimePy = startTimePy + timedelta(minutes=1)
 
             if child[2].text is not None:
-                startTimeXml = child[2].text.replace('\n', ' ').split(".")[0].replace('T', ' ') # Start time
-                startTimePy = datetime.datetime.strptime(startTimeXml,'%Y-%m-%d %H:%M:%S')
+                startTimeXml = child[2].text.replace('\n', ' ') # Start time
+                startTimePy = datetime.datetime.strptime(startTimeXml,'%Y-%m-%dT%H:%M:%S.%fZ') + pytz.timezone('CET').utcoffset(startTimePy)
                 startTime = startTimePy.strftime('%Y%m%d%H%M%S')
 
             durationXml = child[3].text.replace('\n', ' ').replace('PT','') # Duration
@@ -207,16 +212,13 @@ class TvaParser(object):
                 stopTimePy = startTimePy + timedelta(minutes=durationPy)
                 stopTime = stopTimePy.strftime('%Y%m%d%H%M%S') # Stop time
 
-            url ='http://www-60.svc.imagenio.telefonica.net:2001/appserver/mvtv.do?action=getEpgInfo&extInfoID='+ programmeId +                '&tvWholesaler=1'
+            url ='http://www-60.svc.imagenio.telefonica.net:2001/appserver/mvtv.do?action=getEpgInfo&extInfoID='+ programmeId +'&tvWholesaler=1'
             strProgramme = urllib.urlopen(url).read().replace('\n',' ')
+	    jsonProgramme = json.loads(strProgramme.encode(TvaParser.ENCODING_EPG))['resultData']
             #   Genre can be also got from the extra information
             #    s = strProgramme[:]
             #    genre = s.split('"genre":"')[1].split('","')[0] # Genre
-            s = strProgramme[:]
-            if s.find("productionDate")>0:
-                year = s.split('"productionDate":["')[1].split('"],"')[0] # Year
-            else:
-                year = None
+            year = jsonProgramme.get("productionDate")
 
             s = strProgramme[:]
             fullTitle = child[1][0].text
@@ -258,35 +260,21 @@ class TvaParser(object):
                 title = fullTitle[:]
             title = title.replace('\n',' ').encode(TvaParser.ENCODING_EPG)
 
-            s = strProgramme[:]
-            if s.find('"description":"')>0:
-                description = s.split('"description":"')[1].split('","')[0] #.decode(DECODING_EPG,'xmlcharrefreplace').encode(ENCODING_EPG,    'xmlcharrefreplace') # Description
-            else:
-                description = None
-
-            s = strProgramme[:]
-            if s.find('"subgenre":"')>0:
-                subgenre =  s.split('"subgenre":"')[1].split('","')[0] #.encode(ENCODING_EPG) # Subgenre
-            else:
-                subgenre = None
-
-            originalTitle = None
- #           s = strProgramme[:]
- #           if s.find('"originalLongTitle":["')>0:
- #               originalTitle =  s.split('"originalLongTitle":"["')[1].split('"')[0]
- #           else:
- #               originalTitle = None
-
-
+            description = jsonProgramme.get("description")
+            subgenre = jsonProgramme.get("subgenre")
+            originalTitle = jsonProgramme.get("OriginalTitle")
+	    if jsonProgramme.get("longTitle") is not None:
+	      title = jsonProgramme.get("longTitle")[0]
+            mainActors = jsonProgramme.get("mainActors")
 
             ############################################################################
             # Creating XMLTV with XML libraries instead XMLTV to avoid encoding issues #
             ############################################################################
-            channelShort = channelid.replace(".imagenio.es","")
-            if channelShort in channels.keys():
-                channelKey = channels[channelShort]
+            cid = channelid.replace(".imagenio.es","")
+            if cid in clist.keys():
+                channelKey = clist[cid]["shortname"]
             else:
-                channelKey = channelid
+                channelKey = cid
            # cProgramme = SubElement(OBJ_XMLTV,'programme', {"start":startTime+" +0200", "stop": stopTime+" +0200", "channel": channelKey })
             cProgramme = SubElement(xmltv,'programme', {"start":startTime, "stop": stopTime, "channel": channelKey })
             cTitle = SubElement(cProgramme, "title", {"lang":"es"})
@@ -315,22 +303,27 @@ class TvaParser(object):
                 cDuration.text = duration.encode(TvaParser.ENCODING_EPG)
             if year is not None:
                 cDate = SubElement(cProgramme, "date")
-                cDate.text = year
+                cDate.text = year[0]
 
+	    cCredits = SubElement(cProgramme, "credits")
+            if mainActors is not None:
+		for i in mainActors[0].split(","):
+                  cActors  = SubElement(cCredits, "actor")
+                  cActors.text = i
+		
             if len(extra) > 2:
                 extra = extra + " | "
 
             if category is not None and year is not None and originalTitle is not None:
-                extra = extra +  category.encode(TvaParser.ENCODING_EPG)+" | "+year+" | "+originalTitle
+                extra = extra +  category.encode(TvaParser.ENCODING_EPG)+" | "+year[0]+" | "+originalTitle
             elif category is not None and year is  None and originalTitle is None:
                 extra = extra +  category.encode(TvaParser.ENCODING_EPG)
             elif category is not None and year is not None and originalTitle is None:
-                extra = extra +  category.encode(TvaParser.ENCODING_EPG)+" | "+year
+                extra = extra +  category.encode(TvaParser.ENCODING_EPG)+" | "+year[0]
 
             if extra is not None:
                 cDesc = SubElement(cProgramme, "sub-title", {"lang":"es"})
                 cDesc.text = extra
-
 
             if description is not None:
                 cDesc = SubElement(cProgramme, "desc", {"lang":"es"})

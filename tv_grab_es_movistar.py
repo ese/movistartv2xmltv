@@ -26,7 +26,7 @@ logger.setLevel(logging.DEBUG)
 fh = logging.FileHandler('/tmp/movistar.log')
 fh.setLevel(logging.INFO)
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+ch.setLevel(logging.INFO)
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
@@ -39,9 +39,9 @@ reload(sys)
 SOCK_TIMEOUT = 3
 MCAST_GRP_START = '239.0.2.129'
 MCAST_PORT = 3937
-MCAST_CHANNELS = '239.0.2.140'
+MCAST_CHANNELS = '239.0.2.154'
 FILE_XML = '/tmp/tv_grab_es_movistar.xml'
-FILE_M3U = '/tmp/tv_grab_es_movistar.m3u'
+FILE_M3U = '/tmp/tv_grab_es_movistar'
 FILE_LOG = '/tmp/tv_grab_es_movistar.log'
 
 
@@ -139,16 +139,32 @@ OBJ_XMLTV = ET.Element("tv" , {"date":now.strftime("%Y%m%d%H%M%S"),"source_info_
 channelsstream = TvaStream(MCAST_CHANNELS,MCAST_PORT)
 channelsstream.getfiles()
 xmlchannels = channelsstream.files()["2_0"]
+xmlchannelspackages = channelsstream.files()["5_0"]
 
 channelparser = TvaParser(xmlchannels)
-OBJ_XMLTV = channelparser.channels2xmltv(OBJ_XMLTV)
+rawclist = {}
+rawclist = channelparser.channellist(rawclist)
 
-channelsm3u = channelparser.channels2m3u()
-if os.path.isfile(FILE_M3U):
-    os.remove(FILE_M3U)
-fM3u = open(FILE_M3U, 'w+')
-fM3u.write(channelsm3u)
-fM3u.close
+
+channelspackages = {}
+channelspackages = TvaParser(xmlchannelspackages).getpackages()
+
+clist = {}
+for package in channelspackages.keys():
+  clist[package] = {}
+  for channel in channelspackages[package].keys():
+    clist[package][channel] = rawclist[channel]
+    clist[package][channel]["order"] = channelspackages[package][channel]["order"]
+    channelsm3u = channelparser.channels2m3u(clist[package])
+    if os.path.isfile(FILE_M3U+package+".m3u"):
+        os.remove(FILE_M3U+package+".m3u")
+    fM3u = open(FILE_M3U+package+".m3u", 'w+')
+    fM3u.write(channelsm3u)
+    fM3u.close
+    
+
+
+OBJ_XMLTV = channelparser.channels2xmltv(OBJ_XMLTV,rawclist)
 
 i=int(day)+132
 logger.info("\nReading day " + str(i - 132) +"\n")
@@ -157,7 +173,7 @@ epgstream.getfiles()
 for i in epgstream.files().keys():
     logger.info("Parsing "+i)
     epgparser = TvaParser(epgstream.files()[i])
-    epgparser.parseepg(OBJ_XMLTV,channelparser.getchannelsdic())
+    epgparser.parseepg(OBJ_XMLTV,rawclist)
 
 # A standard grabber should print the xmltv file to the stdout
 ElementTree(OBJ_XMLTV).write(FILE_XML)
