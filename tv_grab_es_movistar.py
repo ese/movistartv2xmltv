@@ -176,7 +176,7 @@ for i in epgstream.files().keys():
     epgparser.parseepg(OBJ_XMLTV,rawclist)
 
 # A standard grabber should print the xmltv file to the stdout
-ElementTree(OBJ_XMLTV).write(FILE_XML)
+ElementTree(OBJ_XMLTV).write(FILE_XML,encoding="UTF-8")
 print "Grabbed "+ str(len(OBJ_XMLTV.findall('channel'))) +" channels and "+str(len(OBJ_XMLTV.findall('programme')))+" programmes"
 
 exit()
