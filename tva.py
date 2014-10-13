@@ -214,7 +214,7 @@ class TvaParser(object):
 
             url ='http://www-60.svc.imagenio.telefonica.net:2001/appserver/mvtv.do?action=getEpgInfo&extInfoID='+ programmeId +'&tvWholesaler=1'
             strProgramme = urllib.urlopen(url).read().replace('\n',' ')
-	    jsonProgramme = json.loads(strProgramme.encode(TvaParser.ENCODING_EPG))['resultData']
+	    jsonProgramme = json.loads(strProgramme)['resultData'].encode(TvaParser.ENCODING_EPG)
             #   Genre can be also got from the extra information
             #    s = strProgramme[:]
             #    genre = s.split('"genre":"')[1].split('","')[0] # Genre
@@ -258,7 +258,7 @@ class TvaParser(object):
                 episode = None
                 season = None
                 title = fullTitle[:]
-            title = title.replace('\n',' ').encode(TvaParser.ENCODING_EPG)
+            title = title.replace('\n',' ')
 
             description = jsonProgramme.get("description")
             subgenre = jsonProgramme.get("subgenre")
@@ -278,7 +278,7 @@ class TvaParser(object):
            # cProgramme = SubElement(OBJ_XMLTV,'programme', {"start":startTime+" +0200", "stop": stopTime+" +0200", "channel": channelKey })
             cProgramme = SubElement(xmltv,'programme', {"start":startTime, "stop": stopTime, "channel": channelKey })
             cTitle = SubElement(cProgramme, "title", {"lang":"es"})
-            cTitle.text = title.encode(TvaParser.ENCODING_EPG)
+            cTitle.text = title
             cCategory = SubElement(cProgramme, "category", {"lang":"es"})
             category = None
             if subgenre is not None:
@@ -300,7 +300,7 @@ class TvaParser(object):
 
             if len(duration) > 0:
                 cDuration = SubElement(cProgramme, "length", {"units":"minutes"})
-                cDuration.text = duration.encode(TvaParser.ENCODING_EPG)
+                cDuration.text = duration
             if year is not None:
                 cDate = SubElement(cProgramme, "date")
                 cDate.text = year[0]
@@ -315,11 +315,11 @@ class TvaParser(object):
                 extra = extra + " | "
 
             if category is not None and year is not None and originalTitle is not None:
-                extra = extra +  category.encode(TvaParser.ENCODING_EPG)+" | "+year[0]+" | "+originalTitle
+                extra = extra +  category+" | "+year[0]+" | "+originalTitle
             elif category is not None and year is  None and originalTitle is None:
-                extra = extra +  category.encode(TvaParser.ENCODING_EPG)
+                extra = extra +  category
             elif category is not None and year is not None and originalTitle is None:
-                extra = extra +  category.encode(TvaParser.ENCODING_EPG)+" | "+year[0]
+                extra = extra +  category+" | "+year[0]
 
             if extra is not None:
                 cDesc = SubElement(cProgramme, "sub-title", {"lang":"es"})
@@ -327,4 +327,4 @@ class TvaParser(object):
 
             if description is not None:
                 cDesc = SubElement(cProgramme, "desc", {"lang":"es"})
-                cDesc.text = description.encode(TvaParser.ENCODING_EPG)
+                cDesc.text = description
