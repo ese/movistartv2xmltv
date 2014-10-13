@@ -160,7 +160,7 @@ class TvaParser(object):
                 channelOrder = "99999"
             channelLogo = clist[channelid]["logo"]
             m3ucontent += "#EXTINF:-1," + channelOrder + ' - ' + channelName + '\n'
-            m3ucontent += "#EXTTV:"+','.join(channelTags)+";es;"+channelId+";"+channelLogo+'\n'
+            m3ucontent += "#EXTTV:"+','.join(channelTags)+";es;"+channelKey+";"+channelLogo+'\n'
             m3ucontent += "rtp://@" + channelIp + ":" + channelPort + '\n'
         return m3ucontent
 
