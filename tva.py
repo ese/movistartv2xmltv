@@ -214,14 +214,14 @@ class TvaParser(object):
 
             url ='http://www-60.svc.imagenio.telefonica.net:2001/appserver/mvtv.do?action=getEpgInfo&extInfoID='+ programmeId +'&tvWholesaler=1'
             strProgramme = urllib.urlopen(url).read().replace('\n',' ')
-	    jsonProgramme = json.loads(strProgramme)['resultData'].encode(TvaParser.ENCODING_EPG)
+	    jsonProgramme = json.loads(strProgramme)['resultData']
             #   Genre can be also got from the extra information
             #    s = strProgramme[:]
             #    genre = s.split('"genre":"')[1].split('","')[0] # Genre
             year = jsonProgramme.get("productionDate")
 
             s = strProgramme[:]
-            fullTitle = child[1][0].text
+            fullTitle = child[1][0].text.encode(TvaParser.ENCODING_EPG)
 
             s = fullTitle[:].replace('\n',' ')
             m = re.search(r"(.*?) T(\d+) Cap. (\d+) - (.+)", s)
@@ -238,7 +238,7 @@ class TvaParser(object):
                 if season < 10:
                     season = "0"+str(season)
                 episodeShort = "S"+str(season)+"E"+str(episode)
-                title = m.group(1) # title
+                title = m.group(1).encode(TvaParser.ENCODING_EPG) # title
                 extra =  episodeShort +" "+episodeTitle
             elif n:
                 season = int(n.group(2)) + 1 # season
@@ -279,38 +279,13 @@ class TvaParser(object):
             cProgramme = SubElement(xmltv,'programme', {"start":startTime, "stop": stopTime, "channel": channelKey })
             cTitle = SubElement(cProgramme, "title", {"lang":"es"})
             cTitle.text = title
-            cCategory = SubElement(cProgramme, "category", {"lang":"es"})
             category = None
+
             if subgenre is not None:
                 category = subgenre
-                cCategory.text = category
             elif genre is None:
                 category = genre
-                cCategory.text = category
 
-            if episode is not None and season is not None:
-                cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
-                cEpisode.text = str(season)+"."+str(episode)+"."
-            elif episode is not None and season is None:
-                cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
-                cEpisode.text = "."+str(episode)+"."
-            elif episode is None and season is not None:
-                cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
-                cEpisode.text = str(season)+".."
-
-            if len(duration) > 0:
-                cDuration = SubElement(cProgramme, "length", {"units":"minutes"})
-                cDuration.text = duration
-            if year is not None:
-                cDate = SubElement(cProgramme, "date")
-                cDate.text = year[0]
-
-	    cCredits = SubElement(cProgramme, "credits")
-            if mainActors is not None:
-		for i in mainActors[0].split(","):
-                  cActors  = SubElement(cCredits, "actor")
-                  cActors.text = i
-		
             if len(extra) > 2:
                 extra = extra + " | "
 
@@ -328,3 +303,31 @@ class TvaParser(object):
             if description is not None:
                 cDesc = SubElement(cProgramme, "desc", {"lang":"es"})
                 cDesc.text = description
+
+            cCredits = SubElement(cProgramme, "credits")
+            if mainActors is not None:
+                for i in mainActors[0].split(","):
+                  cActors  = SubElement(cCredits, "actor")
+                  cActors.text = i
+
+            if year is not None:
+                cDate = SubElement(cProgramme, "date")
+                cDate.text = year[0]
+
+
+            cCategory = SubElement(cProgramme, "category", {"lang":"es"})
+	    
+            cCategory.text = category
+            if len(duration) > 0:
+                cDuration = SubElement(cProgramme, "length", {"units":"minutes"})
+                cDuration.text = duration
+
+            if episode is not None and season is not None:
+                cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
+                cEpisode.text = str(season)+"."+str(int(episode)-2)+"."
+            elif episode is not None and season is None:
+                cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
+                cEpisode.text = "."+str(episode)+"."
+            elif episode is None and season is not None:
+                cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
+                cEpisode.text = str(season)+".."
