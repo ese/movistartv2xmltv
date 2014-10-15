@@ -100,6 +100,10 @@ class TvaParser(object):
         self.xmldata = xmldata
         self.logger = logging.getLogger('movistarxmltv.tva.TvaParser')
 
+    def get_mcast_demarcationip(self,dem_code):
+        regexp = re.compile("DEM_" + str(dem_code) +  "\..*?Address\=\\\"(.*?)\\\".*?",re.DOTALL)
+        return regexp.findall(self.xmldata)[0]
+
     def channellist(self,clist):
         root = ET.fromstring(self.xmldata)
         services = root[0][0].findall("{urn:dvb:ipisdns:2006}SingleService")

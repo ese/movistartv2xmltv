@@ -9,6 +9,8 @@ import sys
 import os
 import re
 import logging
+import json
+
 
 # Time handling
 import time
@@ -16,6 +18,8 @@ import datetime
 from datetime import timedelta
 
 # XML
+import urllib
+
 import xml.etree.ElementTree as ET
 from xml.etree.ElementTree import Element, SubElement, Comment, ElementTree
 
@@ -37,46 +41,29 @@ logger.addHandler(ch)
 reload(sys)
 
 SOCK_TIMEOUT = 3
-MCAST_GRP_START = '239.0.2.129'
-MCAST_PORT = 3937
-MCAST_CHANNELS = '239.0.2.154'
 FILE_XML = '/tmp/tv_grab_es_movistar.xml'
 FILE_M3U = '/tmp/tv_grab_es_movistar'
 FILE_LOG = '/tmp/tv_grab_es_movistar.log'
 
+clientprofile = json.loads(urllib.urlopen("http://172.26.22.23:2001/appserver/mvtv.do?action=getClientProfile").read())['resultData']
+platformprofile = json.loads(urllib.urlopen("http://172.26.22.23:2001/appserver/mvtv.do?action=getPlatformProfile").read())['resultData']
+DEMARCATION =  clientprofile["demarcation"]
+TVPACKAGES = clientprofile["tvPackages"].split("|")
+MCAST_GRP_START = platformprofile["dvbConfig"]["dvbEntryPoint"].split(":")[0]
+MCAST_PORT = int(platformprofile["dvbConfig"]["dvbEntryPoint"].split(":")[1])
+logger.info("Init. DEM="+str(DEMARCATION)+" TVPACKS="+str(TVPACKAGES)+" ENTRY_MCAST="+MCAST_GRP_START+":"+str(MCAST_PORT))
 
-# Andalucia 15
-# Aragon    34
-# Asturias  13
-# Cantabria 29
-# Castilla# la# Mancha  38
-# Castilla# y# Leon 4
-# Cataluna  1
-# Comunidad# Valenciana 6
-# Extremadura   32
-# Galicia   24
-# Islas# Baleares   10
-# Islas# Canarias   37
-# La# Rioja 31
-# Madrid    19
-# Murcia    12
-# Navarra   35
-# Pais# Vasco   36
-PROVINCE = '19'
+
 ENCODING_EPG = 'utf-8'
 DECODING_EPG = 'latin1'
 ENCODING_SYS = sys.getdefaultencoding()
-#print "The default system encoding is : " + ENCODING_SYS
 sys.setdefaultencoding(ENCODING_EPG)
-#ENCODING_SYS = sys.getdefaultencoding()
-#print "The system encoding has been set to : " + ENCODING_SYS
 
 
 if len(sys.argv) > 1:
 #    if str(sys.argv[1]) == "--description" or  str(sys.argv[1]) == "-d":
     day = sys.argv[1]
     FILE_XML = '/tmp/tv_grab_es_movistar_'+str(day)+'.xml'
-    print "Spain (Multicast Movistar - py)"
 else:
     print "Usage: "+ sys.argv[0]+' [DAY NUMBER(0 today)]'
     exit()
@@ -127,11 +114,14 @@ programmes = [{'audio': {'stereo': u'stereo'},
 
 
 # Main starts
-# TO-DO: Adding 7th day for EPG
 
-#print "Looking for the ip of your province"
-#ipprovince = getxmlprovince(MCAST_CHANNELS,MCAST_PORT,PROVINCE)
-logger.info("Getting channels list")
+demarcationstream = TvaStream(MCAST_GRP_START,MCAST_PORT)
+demarcationstream.getfiles()
+demarcationxml = demarcationstream.files()["1_0"]
+logger.info("Getting channels source for DEM: "+str(DEMARCATION))
+MCAST_CHANNELS = TvaParser(demarcationxml).get_mcast_demarcationip(DEMARCATION)
+
+logger.info("Getting channels list from: "+MCAST_CHANNELS)
 now = datetime.datetime.now()
 OBJ_XMLTV = ET.Element("tv" , {"date":now.strftime("%Y%m%d%H%M%S"),"source_info_url":"https://go.tv.movistar.es","source_info_name":"Grabber for internal multicast of MovistarTV","generator_info_name":"python-xml-parser","generator_info_url":"http://wiki.xmltv.org/index.php/XMLTVFormat"})
 #OBJ_XMLTV = ET.Element("tv" , {"date":now.strftime("%Y%m%d%H%M%S")+" +0200"})
@@ -145,22 +135,21 @@ channelparser = TvaParser(xmlchannels)
 rawclist = {}
 rawclist = channelparser.channellist(rawclist)
 
-
 channelspackages = {}
 channelspackages = TvaParser(xmlchannelspackages).getpackages()
 
 clist = {}
-for package in channelspackages.keys():
-  clist[package] = {}
+for package in TVPACKAGES:
   for channel in channelspackages[package].keys():
-    clist[package][channel] = rawclist[channel]
-    clist[package][channel]["order"] = channelspackages[package][channel]["order"]
-    channelsm3u = channelparser.channels2m3u(clist[package])
-    if os.path.isfile(FILE_M3U+package+".m3u"):
-        os.remove(FILE_M3U+package+".m3u")
-    fM3u = open(FILE_M3U+package+".m3u", 'w+')
-    fM3u.write(channelsm3u)
-    fM3u.close
+    clist[channel] = rawclist[channel]
+    clist[channel]["order"] = channelspackages[package][channel]["order"]
+  
+channelsm3u = channelparser.channels2m3u(clist)
+if os.path.isfile(FILE_M3U+"_client.m3u"):
+      os.remove(FILE_M3U+"_client.m3u")
+fM3u = open(FILE_M3U+"_client.m3u", 'w+')
+fM3u.write(channelsm3u)
+fM3u.close
     
 
 
