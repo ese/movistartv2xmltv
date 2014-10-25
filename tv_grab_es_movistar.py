@@ -41,14 +41,15 @@ parser.add_argument("--quiet",
 parser.add_argument("--output",
                     help="Redirect the xmltv output to the specified file. Otherwise output goes to stdout.",
                     action="store",
-                    dest="filename",
-                    default="/tmp/tv_grab_es_movistar.xml")
+                    dest="filename")
+# add default="/tmp/tv_grab_es_movistar.xml" above to save to a
+# default file
 parser.add_argument("--days",
                     action = "store",
                     type = int,
                     dest = "grab_days",
                     help = "Supply data for X days. Grabber may have an upper limit to the number of days that it can return data for. If X is larger than that limit, the grabber shall return no data for the days that it lacks data for, print a warning to stderr, and exit with an error-code. See XmltvErrorCodes. In other words, if too many days are requested, the grabber will return data for as many days as it can. The default number of days is 'as many as possible'",
-                    default = 6) # will be default 6-7
+                    default = 6)
 parser.add_argument("--offset",
                     action = "store",
                     type = int,
