@@ -190,15 +190,15 @@ else:
     last_day = args.grab_offset + args.grab_days
     if last_day > 6:
         last_day = 6
-        for d in range(args.grab_offset, last_day):
-            i=int(d)+130
-            logger.info("\nReading day " + str(i - 130) +"\n")
-            epgstream = TvaStream('239.0.2.'+str(i),MCAST_PORT)
-            epgstream.getfiles()
-            for i in epgstream.files().keys():
-                logger.info("Parsing "+i)
-                epgparser = TvaParser(epgstream.files()[i])
-                epgparser.parseepg(OBJ_XMLTV,rawclist)
+    for d in range(args.grab_offset, last_day):
+        i=int(d)+130
+        logger.info("\nReading day " + str(i - 130) +"\n")
+        epgstream = TvaStream('239.0.2.'+str(i),MCAST_PORT)
+        epgstream.getfiles()
+        for i in epgstream.files().keys():
+            logger.info("Parsing "+i)
+            epgparser = TvaParser(epgstream.files()[i])
+            epgparser.parseepg(OBJ_XMLTV,rawclist)
 
     # A standard grabber should print the xmltv file to the stdout or to
     # filename if called with option --output filename
