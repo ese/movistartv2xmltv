@@ -155,8 +155,8 @@ fM3u.close
 
 OBJ_XMLTV = channelparser.channels2xmltv(OBJ_XMLTV,rawclist)
 
-i=int(day)+132
-logger.info("\nReading day " + str(i - 132) +"\n")
+i=int(day)+130
+logger.info("\nReading day " + str(i - 130) +"\n")
 epgstream = TvaStream('239.0.2.'+str(i),MCAST_PORT)
 epgstream.getfiles()
 for i in epgstream.files().keys():
