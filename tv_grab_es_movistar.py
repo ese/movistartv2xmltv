@@ -1,10 +1,6 @@
 #!/usr/bin/env python
 # TO DO:
 # - Fixing encoding and parsing issues
-<<<<<<< HEAD
-# - Moving m3u creation to its own option
-=======
->>>>>>> ese-master
 # - Moving log file to its own option
 # - Using a temporary file to save user province, channels and epg days, so we save time in each execution
 
@@ -41,46 +37,49 @@ else:
     config['offset'] = 0
 
 parser = argparse.ArgumentParser()
+
 parser.add_argument("--description",
                     help="show 'Spain: Movistar IPTV grabber'",
                     action="store_true")
+
 parser.add_argument("--capabilities",
                     help="show xmltv capabilities",
                     action="store_true")
+
 # config arguments
 parser.add_argument("--quiet",
                     help="Suppress all progress information. The grabber shall only print error-messages to stderr.",
                     action="store_true",
                     default = config['quiet'])
+
 parser.add_argument("--output",
                     help="Redirect the xmltv output to the specified file. Otherwise output goes to stdout.",
                     action="store",
                     dest="filename",
                     default=config['filename'])
+
 parser.add_argument("--days",
                     action = "store",
                     type = int,
                     dest = "grab_days",
                     help = "Supply data for X days. Grabber may have an upper limit to the number of days that it can return data for. If X is larger than that limit, the grabber shall return no data for the days that it lacks data for, print a warning to stderr, and exit with an error-code. See XmltvErrorCodes. In other words, if too many days are requested, the grabber will return data for as many days as it can. The default number of days is 'as many as possible'",
                     default = config['days'])
+
 parser.add_argument("--offset",
                     action = "store",
                     type = int,
                     dest = "grab_offset",
                     help = "Start with data for day today plus X days. The default is 0, today; 1 means start from tomorrow, etc. ",
                     default = config['offset'])
+
 parser.add_argument("--config-file",
                     action="store",
                     dest="config_file",
                     help = "The grabber shall read all configuration data from the specified file.")
-                    default = 0)
-parser.add_argument("--config-file",
-                    action="store",
-                    dest="config_file",
-                    help = "The grabber shall read all configuration data from the specified file.")
+
 parser.add_argument("--m3u",
                     help = "Dump channels in m3u format",
-                    action = "store_true")
+                    action = "store")
 
 args = parser.parse_args()
 
@@ -115,20 +114,16 @@ else:
 
     reload(sys)
 
-<<<<<<< HEAD
-    SOCK_TIMEOUT = 3
-    FILE_M3U = '/tmp/tv_grab_es_movistar'
-    FILE_LOG = '/tmp/tv_grab_es_movistar.log'
-
-    # si no existen ya demarcation, tvpackages, mcast_grp_start, mcast_port 
-=======
->>>>>>> ese-master
-    clientprofile = json.loads(urllib.urlopen("http://172.26.22.23:2001/appserver/mvtv.do?action=getClientProfile").read())['resultData']
-    platformprofile = json.loads(urllib.urlopen("http://172.26.22.23:2001/appserver/mvtv.do?action=getPlatformProfile").read())['resultData']
-    DEMARCATION =  clientprofile["demarcation"]
-    TVPACKAGES = clientprofile["tvPackages"].split("|")
-    MCAST_GRP_START = platformprofile["dvbConfig"]["dvbEntryPoint"].split(":")[0]
-    MCAST_PORT = int(platformprofile["dvbConfig"]["dvbEntryPoint"].split(":")[1])
+    if not config['demarcation'] and config['tvpackages'] and config['mcast_grp_start'] and config['mcast_port']: 
+        clientprofile = json.loads(urllib.urlopen("http://172.26.22.23:2001/appserver/mvtv.do?action=getClientProfile").read())['resultData']
+        platformprofile = json.loads(urllib.urlopen("http://172.26.22.23:2001/appserver/mvtv.do?action=getPlatformProfile").read())['resultData']
+        config['demarcation'] =  clientprofile["demarcation"]
+        config['tvpackages'] = clientprofile["tvPackages"].split("|")
+        config['mcast_grp_start'] = platformprofile["dvbConfig"]["dvbEntryPoint"].split(":")[0]
+        config['mcast_port'] = int(platformprofile["dvbConfig"]["dvbEntryPoint"].split(":")[1])
+        with open('tv_grab_es_movistar.config', 'w') as outfile:
+            json.dump(config, outfile)
+    
     logger.info("Init. DEM="+str(DEMARCATION)+" TVPACKS="+str(TVPACKAGES)+" ENTRY_MCAST="+MCAST_GRP_START+":"+str(MCAST_PORT))
 
     ENCODING_EPG = 'utf-8'
@@ -204,7 +199,7 @@ else:
         ElementTree(OBJ_XMLTV).write(FILE_XML,encoding="UTF-8")
     else:
         dump(ElementTree(OBJ_XMLTV))
-    # changed to logger to respect --quiet
+
     logger.info("Grabbed "+ str(len(OBJ_XMLTV.findall('channel'))) +" channels and "+str(len(OBJ_XMLTV.findall('programme')))+" programmes")
 
 exit()
