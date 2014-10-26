@@ -216,8 +216,8 @@ class TvaParser(object):
 
             if child[2].text is not None:
                 startTimeXml = child[2].text.replace('\n', ' ') # Start time
-                startTimePy = datetime.datetime.strptime(startTimeXml,'%Y-%m-%dT%H:%M:%S.%fZ') + pytz.timezone('CET').utcoffset(startTimePy)
-                startTime = startTimePy.strftime('%Y%m%d%H%M%S')
+                startTimePy = datetime.datetime.strptime(startTimeXml,'%Y-%m-%dT%H:%M:%S.%fZ')
+                startTime = startTimePy.strftime('%Y%m%d%H%M%S') + ' +0000'
 
             durationXml = child[3].text.replace('\n', ' ').replace('PT','') # Duration
             if durationXml.find('H') > 0 and durationXml.find('M') > 0:
@@ -232,7 +232,7 @@ class TvaParser(object):
                 durationPy = 60 * int(durationPy.strftime('%H')) + int(durationPy.strftime('%M'))
                 duration = str(durationPy)
                 stopTimePy = startTimePy + timedelta(minutes=durationPy)
-                stopTime = stopTimePy.strftime('%Y%m%d%H%M%S') # Stop time
+                stopTime = stopTimePy.strftime('%Y%m%d%H%M%S') + ' +0000' # Stop time
 
             url ='http://www-60.svc.imagenio.telefonica.net:2001/appserver/mvtv.do?action=getEpgInfo&extInfoID='+ programmeId +'&tvWholesaler=1'
             try:
@@ -276,7 +276,7 @@ class TvaParser(object):
                 title = n.group(1) # title
                 extra =  episodeShort
             elif s.find(': Episodio ') > 0 :
-                episode = int(s.split(': Episodio ')[1].split('"')[0]) + 1 # Episode
+                episode = re.findall(r'[0-9]+', s)[0] # Episode
                 season = 0
                 title = s.split(': Episodio ')[0] # Title
             else:
