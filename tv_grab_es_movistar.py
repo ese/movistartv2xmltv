@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # TO DO:
 # - Fixing encoding and parsing issues
-# - Moving log file to its own option
 # - Using a temporary file to save user province, channels and epg days, so we save time in each execution
 
 # Stardard tools
@@ -35,6 +34,7 @@ else:
     config['filename'] = False
     config['days'] = 6
     config['offset'] = 0
+    config['logfile'] = '/tmp/movistar.log'
 
 parser = argparse.ArgumentParser()
 
@@ -79,7 +79,13 @@ parser.add_argument("--config-file",
 
 parser.add_argument("--m3u",
                     help = "Dump channels in m3u format",
-                    action = "store")
+                    action = "store_true")
+
+parser.add_argument("--log-file",
+                    help = "write to the specified log file, if not will log to /tmp/movistar.log or as per config",
+                    action = "store",
+                    dest = "log_file",
+                    default = config['logfile'])
 
 args = parser.parse_args()
 
@@ -100,7 +106,7 @@ else:
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     # log to file
-    fh = logging.FileHandler('/tmp/movistar.log')
+    fh = logging.FileHandler(config['logfile'])
     fh.setLevel(logging.INFO)
     fh.setFormatter(formatter)
     logger.addHandler(fh)
