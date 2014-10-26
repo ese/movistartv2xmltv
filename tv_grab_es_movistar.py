@@ -4,6 +4,7 @@
 # - Adding tv_grab standard options
 #   --config-file
 # - Moving m3u creation to its own option
+# - Moving log file to its own option
 # - Using a temporary file to save user province, channels and epg days, so we save time in each execution
 
 # Stardard tools
@@ -27,6 +28,16 @@ from xml.etree.ElementTree import Element, SubElement, Comment, ElementTree, dum
 # ese's tva lib
 from tva import TvaStream, TvaParser
 
+# load config file values
+config = {}
+if os.path.isfile('tv_grab_es_movistar.config'):
+    with open('tv_grab_es_movistar.config') as json_config:
+        config = json.load(json_config)
+else:
+    config['quiet'] = False
+    config['filename'] = False
+    config['days'] = 6
+    config['offset'] = 0
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--description",
@@ -35,31 +46,32 @@ parser.add_argument("--description",
 parser.add_argument("--capabilities",
                     help="show xmltv capabilities",
                     action="store_true")
+# config arguments
 parser.add_argument("--quiet",
                     help="Suppress all progress information. The grabber shall only print error-messages to stderr.",
-                    action="store_true")
+                    action="store_true",
+                    default = config['quiet'])
 parser.add_argument("--output",
                     help="Redirect the xmltv output to the specified file. Otherwise output goes to stdout.",
                     action="store",
-                    dest="filename")
-# add default="/tmp/tv_grab_es_movistar.xml" above to save to a
-# default file
+                    dest="filename",
+                    default=config['filename'])
 parser.add_argument("--days",
                     action = "store",
                     type = int,
                     dest = "grab_days",
                     help = "Supply data for X days. Grabber may have an upper limit to the number of days that it can return data for. If X is larger than that limit, the grabber shall return no data for the days that it lacks data for, print a warning to stderr, and exit with an error-code. See XmltvErrorCodes. In other words, if too many days are requested, the grabber will return data for as many days as it can. The default number of days is 'as many as possible'",
-                    default = 6)
+                    default = config['days'])
 parser.add_argument("--offset",
                     action = "store",
                     type = int,
                     dest = "grab_offset",
                     help = "Start with data for day today plus X days. The default is 0, today; 1 means start from tomorrow, etc. ",
-                    default = 0)
-#parser.add_argument("--config-file",
-#                    action="store",
-#                    dest="config_file",
-#                    help = "The grabber shall read all configuration data from the specified file.")
+                    default = config['offset'])
+parser.add_argument("--config-file",
+                    action="store",
+                    dest="config_file",
+                    help = "The grabber shall read all configuration data from the specified file.")
 
 args = parser.parse_args()
 
@@ -67,6 +79,13 @@ if args.description:
     print "Spain: Movistar IPTV grabber"
 elif args.capabilities:
     print "baseline"
+elif args.config_file:
+    if os.path.isfile(args.config_file):
+        with open(args.config_file) as json_config:
+            config = json.load(json_config)
+    else:
+        print 'Config file does not exist'
+        exit()
 else:
     logger = logging.getLogger('movistarxmltv')
     logger.setLevel(logging.DEBUG)
