@@ -3,7 +3,6 @@
 # - Fixing encoding and parsing issues
 # - Adding tv_grab standard options
 #   --config-file
-# - Moving m3u creation to its own option
 # - Using a temporary file to save user province, channels and epg days, so we save time in each execution
 
 # Stardard tools
@@ -60,6 +59,11 @@ parser.add_argument("--offset",
 #                    action="store",
 #                    dest="config_file",
 #                    help = "The grabber shall read all configuration data from the specified file.")
+parser.add_argument("--m3u",
+                    help = "Dump channels in m3u format",
+                    action = "store_true")
+
+
 
 args = parser.parse_args()
 
@@ -88,7 +92,6 @@ else:
     reload(sys)
 
     SOCK_TIMEOUT = 3
-    FILE_M3U = '/tmp/tv_grab_es_movistar'
     FILE_LOG = '/tmp/tv_grab_es_movistar.log'
 
     clientprofile = json.loads(urllib.urlopen("http://172.26.22.23:2001/appserver/mvtv.do?action=getClientProfile").read())['resultData']
@@ -173,19 +176,26 @@ else:
     channelspackages = {}
     channelspackages = TvaParser(xmlchannelspackages).getpackages()
 
-    clist = {}
-    for package in TVPACKAGES:
-        for channel in channelspackages[package].keys():
-            clist[channel] = rawclist[channel]
-            clist[channel]["order"] = channelspackages[package][channel]["order"]
-  
-    channelsm3u = channelparser.channels2m3u(clist)
-    if os.path.isfile(FILE_M3U+"_client.m3u"):
-        os.remove(FILE_M3U+"_client.m3u")
-    fM3u = open(FILE_M3U+"_client.m3u", 'w+')
-    fM3u.write(channelsm3u)
-    fM3u.close
-    
+    # If m3u arg create m3u and exit
+    if args.m3u:
+        clist = {}
+        for package in TVPACKAGES:
+            for channel in channelspackages[package].keys():
+                clist[channel] = rawclist[channel]
+                clist[channel]["order"] = channelspackages[package][channel]["order"]
+
+        channelsm3u = channelparser.channels2m3u(clist)
+        if args.filename:
+            FILE_M3U = args.filename
+            if os.path.isfile(FILE_M3U):
+                os.remove(FILE_M3U)
+            fM3u = open(FILE_M3U, 'w+')
+            fM3u.write(channelsm3u)
+            fM3u.close
+        else:
+            print channelsm3u
+        exit()
+
     OBJ_XMLTV = channelparser.channels2xmltv(OBJ_XMLTV,rawclist)
 
     last_day = args.grab_offset + args.grab_days
