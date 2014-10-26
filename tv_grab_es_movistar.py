@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # TO DO:
 # - Fixing encoding and parsing issues
-# - Adding tv_grab standard options
-#   --config-file
 # - Moving m3u creation to its own option
 # - Moving log file to its own option
 # - Using a temporary file to save user province, channels and epg days, so we save time in each execution
@@ -110,6 +108,7 @@ else:
     FILE_M3U = '/tmp/tv_grab_es_movistar'
     FILE_LOG = '/tmp/tv_grab_es_movistar.log'
 
+    # si no existen ya demarcation, tvpackages, mcast_grp_start, mcast_port 
     clientprofile = json.loads(urllib.urlopen("http://172.26.22.23:2001/appserver/mvtv.do?action=getClientProfile").read())['resultData']
     platformprofile = json.loads(urllib.urlopen("http://172.26.22.23:2001/appserver/mvtv.do?action=getPlatformProfile").read())['resultData']
     DEMARCATION =  clientprofile["demarcation"]
