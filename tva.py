@@ -194,6 +194,7 @@ class TvaParser(object):
             self.logger.info("\nError parsing xml, skipping...\n")
             self.logger.info(str(ET.ParseError))
             self.logger.info("\nerror on row" + str(row) + "column" + str(column) + ":" + str(v) + "\n")
+            return
         #root = tree.getroot()
 
         if root[0][0][0].get('serviceIDRef') is not None:
