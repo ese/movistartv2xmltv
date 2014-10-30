@@ -64,7 +64,7 @@ class TvaStream(object):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.settimeout(3)
-        sock.bind(('', self.mcast_port))
+        sock.bind((self.mcast_grp, self.mcast_port))
         mreq = struct.pack("=4sl", socket.inet_aton(self.mcast_grp), socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         loop = True
