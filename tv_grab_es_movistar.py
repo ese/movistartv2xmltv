@@ -17,6 +17,10 @@ import time
 import datetime
 from datetime import timedelta
 
+#Threading
+import threading
+
+
 # XML
 import urllib
 import xml.etree.ElementTree as ET
@@ -35,6 +39,17 @@ else:
     config['filename'] = False
     config['days'] = 6
     config['offset'] = 0
+
+def parse_day(n,xmltv,rawclist):
+    i = n + 130
+    logger.info("\nReading day " + str(i - 130) +"\n")
+    epgstream = TvaStream('239.0.2.'+str(i),MCAST_PORT)
+    epgstream.getfiles()
+    for i in epgstream.files().keys():
+        logger.info("Parsing "+i)
+        epgparser = TvaParser(epgstream.files()[i])
+        epgparser.parseepg(OBJ_XMLTV,rawclist)
+    return
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--description",
@@ -175,15 +190,15 @@ else:
     last_day = args.grab_offset + args.grab_days
     if last_day > 6:
         last_day = 6
+
+    threads = list()
     for d in range(args.grab_offset, last_day):
-        i=int(d)+130
-        logger.info("\nReading day " + str(i - 130) +"\n")
-        epgstream = TvaStream('239.0.2.'+str(i),MCAST_PORT)
-        epgstream.getfiles()
-        for i in epgstream.files().keys():
-            logger.info("Parsing "+i)
-            epgparser = TvaParser(epgstream.files()[i])
-            epgparser.parseepg(OBJ_XMLTV,rawclist)
+        t =  threading.Thread(target=parse_day, args=(d,OBJ_XMLTV,rawclist)) 
+        threads.append(t)
+        t.start()
+
+    [x.join() for x in threads]    
+
 
     # A standard grabber should print the xmltv file to the stdout or to
     # filename if called with option --output filename
