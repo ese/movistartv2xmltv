@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # TO DO:
 # - Fixing encoding and parsing issues
-# - Using a temporary file to save user province, channels and epg days, so we save time in each execution
+# - Using a temporary file to save channels, so we save time in each execution
 
 # Stardard tools
 import sys
@@ -19,7 +19,6 @@ from datetime import timedelta
 #Threading
 import threading
 
-
 # XML
 import urllib
 import xml.etree.ElementTree as ET
@@ -27,6 +26,17 @@ from xml.etree.ElementTree import Element, SubElement, Comment, ElementTree, dum
 
 # ese's tva lib
 from tva import TvaStream, TvaParser
+
+def parse_day(n,xmltv,rawclist):
+    i = n + 130
+    logger.info("\nReading day " + str(i - 130) +"\n")
+    epgstream = TvaStream('239.0.2.'+str(i),config['mcast_port'])
+    epgstream.getfiles()
+    for i in epgstream.files().keys():
+        logger.info("Parsing "+i)
+        epgparser = TvaParser(epgstream.files()[i])
+        epgparser.parseepg(OBJ_XMLTV,rawclist)
+    return
 
 # load config file values
 config = {}
@@ -39,17 +49,7 @@ else:
     config['days'] = 6
     config['offset'] = 0
     config['logfile'] = '/tmp/movistar.log'
-
-def parse_day(n,xmltv,rawclist):
-    i = n + 130
-    logger.info("\nReading day " + str(i - 130) +"\n")
-    epgstream = TvaStream('239.0.2.'+str(i),MCAST_PORT)
-    epgstream.getfiles()
-    for i in epgstream.files().keys():
-        logger.info("Parsing "+i)
-        epgparser = TvaParser(epgstream.files()[i])
-        epgparser.parseepg(OBJ_XMLTV,rawclist)
-    return
+    config['demarcation'] = ''
 
 parser = argparse.ArgumentParser()
 
@@ -135,7 +135,7 @@ else:
 
     reload(sys)
 
-    if not config['demarcation'] and config['tvpackages'] and config['mcast_grp_start'] and config['mcast_port']: 
+    if config['demarcation']=='' or config['tvpackages']=='' or config['mcast_grp_start']=='' or config['mcast_port']=='': 
         clientprofile = json.loads(urllib.urlopen("http://172.26.22.23:2001/appserver/mvtv.do?action=getClientProfile").read())['resultData']
         platformprofile = json.loads(urllib.urlopen("http://172.26.22.23:2001/appserver/mvtv.do?action=getPlatformProfile").read())['resultData']
         config['demarcation'] =  clientprofile["demarcation"]
@@ -144,8 +144,8 @@ else:
         config['mcast_port'] = int(platformprofile["dvbConfig"]["dvbEntryPoint"].split(":")[1])
         with open('tv_grab_es_movistar.config', 'w') as outfile:
             json.dump(config, outfile)
-    
-    logger.info("Init. DEM="+str(DEMARCATION)+" TVPACKS="+str(TVPACKAGES)+" ENTRY_MCAST="+MCAST_GRP_START+":"+str(MCAST_PORT))
+ 
+    logger.info("Init. DEM="+str(config['demarcation'])+" TVPACKS="+str(config['tvpackages'])+" ENTRY_MCAST="+str(config['mcast_grp_start'])+":"+str(config['mcast_port']))
 
     ENCODING_EPG = 'utf-8'
     ENCODING_SYS = sys.getdefaultencoding()
@@ -153,12 +153,12 @@ else:
 
     # Main starts
 
-    demarcationstream = TvaStream(MCAST_GRP_START,MCAST_PORT)
+    demarcationstream = TvaStream(config['mcast_grp_start'],config['mcast_port'])
     demarcationstream.getfiles()
     demarcationxml = demarcationstream.files()["1_0"]
 
-    logger.info("Getting channels source for DEM: "+str(DEMARCATION))
-    MCAST_CHANNELS = TvaParser(demarcationxml).get_mcast_demarcationip(DEMARCATION)
+    logger.info("Getting channels source for DEM: "+str(config['demarcation']))
+    MCAST_CHANNELS = TvaParser(demarcationxml).get_mcast_demarcationip(config['demarcation'])
 
 
     now = datetime.datetime.utcnow()
@@ -166,7 +166,7 @@ else:
     #OBJ_XMLTV = ET.Element("tv" , {"date":now.strftime("%Y%m%d%H%M%S")+" +0200"})
 
     logger.info("Getting channels list from: "+MCAST_CHANNELS)
-    channelsstream = TvaStream(MCAST_CHANNELS,MCAST_PORT)
+    channelsstream = TvaStream(MCAST_CHANNELS,config['mcast_port'])
     channelsstream.getfiles()
     xmlchannels = channelsstream.files()["2_0"]
     xmlchannelspackages = channelsstream.files()["5_0"]
