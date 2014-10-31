@@ -64,7 +64,7 @@ class TvaStream(object):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.settimeout(3)
-        sock.bind(('', self.mcast_port))
+        sock.bind((self.mcast_grp, self.mcast_port))
         mreq = struct.pack("=4sl", socket.inet_aton(self.mcast_grp), socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         loop = True
@@ -194,6 +194,7 @@ class TvaParser(object):
             self.logger.info("\nError parsing xml, skipping...\n")
             self.logger.info(str(ET.ParseError))
             self.logger.info("\nerror on row" + str(row) + "column" + str(column) + ":" + str(v) + "\n")
+            return
         #root = tree.getroot()
 
         if root[0][0][0].get('serviceIDRef') is not None:
@@ -362,3 +363,14 @@ class TvaParser(object):
             elif episode is None and season is not None:
                 cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
                 cEpisode.text = str(season)+".."
+
+            rating_tvchip = {
+                    "Suitable for all audiences": "TV-G",
+                    "Suitable for audiences 7 and over": "TV-Y7",
+                    "Suitable for audiences 12 and over": "TV-14",
+                    "Suitable for audiences 18 and over": "TV-MA"}
+            if child[1].find('{urn:tva:metadata:2007}ParentalGuidance')[0][0].text is not None:
+                rating = rating_tvchip.get(child[1].find('{urn:tva:metadata:2007}ParentalGuidance')[0][0].text.replace('\n',' '))
+                cRating = SubElement(cProgramme, "rating", {"system":"VCHIP"})
+                cRatingvalue = SubElement(cRating, "value")
+                cRatingvalue.text = rating
