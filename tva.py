@@ -363,3 +363,14 @@ class TvaParser(object):
             elif episode is None and season is not None:
                 cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
                 cEpisode.text = str(season)+".."
+
+            rating_tvchip = {
+                    "Suitable for all audiences": "TV-G",
+                    "Suitable for audiences 7 and over": "TV-Y7",
+                    "Suitable for audiences 12 and over": "TV-14",
+                    "Suitable for audiences 18 and over": "TV-MA"}
+            if child[1].find('{urn:tva:metadata:2007}ParentalGuidance')[0][0].text is not None:
+                rating = rating_tvchip.get(child[1].find('{urn:tva:metadata:2007}ParentalGuidance')[0][0].text.replace('\n',' '))
+                cRating = SubElement(cProgramme, "rating", {"system":"VCHIP"})
+                cRatingvalue = SubElement(cRating, "value")
+                cRatingvalue.text = rating
