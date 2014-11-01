@@ -313,7 +313,7 @@ class TvaParser(object):
                 episode = None
                 season = None
                 title = fullTitle[:]
-            title = title.replace('\n',' ').encode(TvaParser.ENCODING_EPG
+            title = title.replace('\n',' ').encode(TvaParser.ENCODING_EPG)
 
 
             description = jsonProgramme.get("description")
@@ -385,13 +385,13 @@ class TvaParser(object):
 
             if episode is not None and season is not None:
                 cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
-                cEpisode.text = str(int(season)-1)+"."+str(int(episode)-1)+"."
+                cEpisode.text = str(int(season) - 1)+"."+str(int(episode) - 1)+"."
             elif episode is not None and season is None:
                 cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
-                cEpisode.text = "."+str(int(episode)-1)+"."
+                cEpisode.text = "."+str(int(episode) - 1)+"."
             elif episode is None and season is not None:
                 cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
-                cEpisode.text = str(int(season)-1)+".."
+                cEpisode.text = str(int(season) - 1)+".."
 
             rating_tvchip = {
                     "Suitable for all audiences": "TV-G",
