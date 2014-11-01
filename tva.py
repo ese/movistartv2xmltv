@@ -191,16 +191,20 @@ class TvaParser(object):
             root = ET.fromstring(self.xmldata)
         except ET.ParseError, v:
             row, column = v.position
-            self.logger.info("\nError parsing xml, skipping...\n")
-            self.logger.info(str(ET.ParseError))
-            self.logger.info("\nerror on row" + str(row) + "column" + str(column) + ":" + str(v) + "\n")
+            self.logger.error("Error parsing xml, skipping...")
+            self.logger.error(str(ET.ParseError))
+            self.logger.error("error on row" + str(row) + "column" + str(column) + ":" + str(v))
             return
         #root = tree.getroot()
 
         if root[0][0][0].get('serviceIDRef') is not None:
             channelid = root[0][0][0].get('serviceIDRef')
+        else:
+            self.logger.info("No serviceIDRef found")
+            return None
 
         for child in root[0][0][0]:
+            programmeId = None
             if child[0].get('crid') is not None:
                 programmeId = child[0].get('crid').split('/')[5]   # id for description
             if child[1][1][0] is not None:
@@ -235,62 +239,88 @@ class TvaParser(object):
                 stopTimePy = startTimePy + timedelta(minutes=durationPy)
                 stopTime = stopTimePy.strftime('%Y%m%d%H%M%S') + ' +0000' # Stop time
 
-            url ='http://www-60.svc.imagenio.telefonica.net:2001/appserver/mvtv.do?action=getEpgInfo&extInfoID='+ programmeId +'&tvWholesaler=1'
+
             try:
+                url ='http://www-60.svc.imagenio.telefonica.net:2001/appserver/mvtv.do?action=getEpgInfo&extInfoID='+ programmeId +'&tvWholesaler=1'
                 strProgramme = urllib.urlopen(url).read().replace('\n',' ')
                 jsonProgramme = json.loads(strProgramme)['resultData']
             except:
                 jsonProgramme = {}
+                self.logger.error("Download program info failed")
+
             #   Genre can be also got from the extra information
             #    s = strProgramme[:]
             #    genre = s.split('"genre":"')[1].split('","')[0] # Genre
             year = jsonProgramme.get("productionDate")
 
             s = strProgramme[:]
-            fullTitle = child[1][0].text.encode(TvaParser.ENCODING_EPG)
+            fullTitle = child[1][0].text.replace('\n', ' ').replace('Cine: ', '')
 
-            s = fullTitle[:].replace('\n',' ')
+            s = fullTitle[:]
             m = re.search(r"(.*?) T(\d+) Cap. (\d+) - (.+)", s)
             n = re.search(r"(.*?) T(\d+) Cap. (\d+)", s)
+            p = re.search(r"(.*?): (.*?)", s)
             title = None
             episodeShort = None
             extra = ""
             if m:
-                season = int(m.group(2)) + 1 # season
-                episode = int(m.group(3)) +1 # episode
-                episodeTitle =  m.group(4)
-                if episode < 10:
-                    episode = "0"+str(episode)
-                if season < 10:
-                    season = "0"+str(season)
-                episodeShort = "S"+str(season)+"E"+str(episode)
-                title = m.group(1).encode(TvaParser.ENCODING_EPG) # title
-                extra =  episodeShort +" "+episodeTitle
+                try:
+                    season = int(m.group(2))  # season
+                    episode = int(m.group(3)) # episode
+                    episodeTitle =  m.group(4)
+                    if episode < 10:
+                        episode = "0"+str(episode)
+                    if season < 10:
+                        season = "0"+str(season)
+                    episodeShort = "S"+str(season)+"E"+str(episode)
+                    extra =  episodeShort +" "+episodeTitle
+                except ValueError:
+                    self.logger.error("m: Error getting episode in: " + fullTitle)
+                title = m.group(1) # title
+
             elif n:
-                season = int(n.group(2)) + 1 # season
-                episode = int(n.group(3)) +1 # episode
-                if episode < 10:
-                    episode = "0"+str(episode)
-                if season < 10:
-                    season = "0"+str(season)
-                episodeShort = "S"+str(season)+"E"+str(episode)
+                try:
+                    season = int(n.group(2))  # season
+                    episode = int(n.group(3)) # episode
+                    if episode < 10:
+                        episode = "0"+str(episode)
+                    if season < 10:
+                        season = "0"+str(season)
+                    episodeShort = "S"+str(season)+"E"+str(episode)
+                    extra =  episodeShort
+                except ValueError:
+                    self.logger.error("n: Error getting episode in: " + fullTitle)
                 title = n.group(1) # title
-                extra =  episodeShort
+
             elif s.find(': Episodio ') > 0 :
-                episode = re.findall(r'[0-9]+', s)[0] # Episode
-                season = 0
+                try:
+                    episode = re.findall(r'[0-9]+', s)[0] # Episode
+                    season = 0
+                except ValueError:
+                    self.logger.error("Error getting episode in: " + fullTitle)
                 title = s.split(': Episodio ')[0] # Title
+            elif p:
+                self.logger.info("Grabbing episode in: " + fullTitle)
+                try:
+                    title = p.group(1) # title
+                    episodeTitle =  p.group(2)
+                    episode = None
+                    season = None
+                except ValueError:
+                    self.logger.error("n: Error getting episode in: " + fullTitle)
+
             else:
                 episode = None
                 season = None
                 title = fullTitle[:]
-            title = title.replace('\n',' ')
+            title = title.replace('\n',' ').encode(TvaParser.ENCODING_EPG
+
 
             description = jsonProgramme.get("description")
             subgenre = jsonProgramme.get("subgenre")
             originalTitle = jsonProgramme.get("OriginalTitle")
-            if jsonProgramme.get("longTitle") is not None:
-                title = jsonProgramme.get("longTitle")[0]
+            #if jsonProgramme.get("longTitle") is not None:
+            #    title = jsonProgramme.get("longTitle")[0]
             mainActors = jsonProgramme.get("mainActors")
 
             ############################################################################
@@ -356,13 +386,13 @@ class TvaParser(object):
 
             if episode is not None and season is not None:
                 cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
-                cEpisode.text = str(season)+"."+str(int(episode)-2)+"."
+                cEpisode.text = str(int(season)-1)+"."+str(int(episode)-1)+"."
             elif episode is not None and season is None:
                 cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
-                cEpisode.text = "."+str(episode)+"."
+                cEpisode.text = "."+str(int(episode)-1)+"."
             elif episode is None and season is not None:
                 cEpisode = SubElement(cProgramme, "episode-num", {"system":"xmltv_ns"})
-                cEpisode.text = str(season)+".."
+                cEpisode.text = str(int(season)-1)+".."
 
             rating_tvchip = {
                     "Suitable for all audiences": "TV-G",
