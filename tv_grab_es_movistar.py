@@ -29,7 +29,7 @@ from tva import TvaStream, TvaParser
 
 def parse_day(n,xmltv,rawclist):
     i = n + 130
-    logger.info("\nReading day " + str(i - 130) +"\n")
+    logger.info("Reading day " + str(i - 130))
     epgstream = TvaStream('239.0.2.'+str(i),config['mcast_port'])
     epgstream.getfiles()
     for i in epgstream.files().keys():
