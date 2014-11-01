@@ -9,7 +9,7 @@ You need to *setup dns 172.26.23.3* to resolve internals urls.
 
 ## Integration with xmltv-util
 
-Install xmltv-util and add sumbolic link to tv_grab_es_movistar.py in PATH
+Install xmltv-util and add symbolic link to tv_grab_es_movistar.py in PATH
 
 ```
 $ sudo apt-get install xmltv-util
@@ -21,7 +21,9 @@ $ sudo ln -s /home/multimedia/source/movistartv2xmltv/tv_grab_es_movistar.py /us
 $ python tv_grab_es_movistar.py
 usage: tv_grab_es_movistar.py [-h] [--description] [--capabilities] [--quiet]
                               [--output FILENAME] [--days GRAB_DAYS]
-                              [--offset GRAB_OFFSET] [--m3u]
+                              [--offset GRAB_OFFSET]
+                              [--config-file CONFIG_FILE] [--m3u]
+                              [--log-file LOG_FILE]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -42,7 +44,13 @@ optional arguments:
                         'as many as possible'
   --offset GRAB_OFFSET  Start with data for day today plus X days. The default
                         is 0, today; 1 means start from tomorrow, etc.
+  --config-file CONFIG_FILE
+                        The grabber shall read all configuration data from the
+                        specified file.
   --m3u                 Dump channels in m3u format
+  --log-file LOG_FILE   write to the specified log file, if not will log to
+                        /tmp/movistar.log or as per config
+
 ```
 
 ## Examples
@@ -70,3 +78,19 @@ $ python m3u2hts.py  -c utf-8 -r channels.m3u
 ```
 
 Configuration files for tvheadend are in `/home/hts/.hts/tvheadend` and maybe you need to adjust permissions
+
+## TVheadend problems
+
+If you get run errors in tvheadend such as:
+```
+Oct 31 22:34:06.530 /usr/bin/tv_grab_es: grab /usr/bin/tv_grab_es
+Oct 31 22:34:06.753 /usr/bin/tv_grab_es: no output detected
+Oct 31 22:34:06.753 /usr/bin/tv_grab_es: grab returned no data
+```
+you can enable xmltv.sock in tvheadend to insert the content of the xmltv file with the command socat:
+
+```
+# apt-get install socat
+
+$ cat /home/hts/xmltv/tv_grab_es.xml | socat - UNIX-CONNECT:/home/hts/.hts/tvheadend/epggrab/xmltv.sock
+```
