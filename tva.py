@@ -342,12 +342,6 @@ class TvaParser(object):
             elif genre is None:
                 category = genre
 
-            json_data=open("categories.json").read()
-            categories_map = json.loads(json_data)
-
-            if categories_map.get(category) is not None:
-                category = categories_map.get(category)
-
             if len(extra) > 2:
                 extra = extra + " | "
 
@@ -376,6 +370,11 @@ class TvaParser(object):
                 cDate = SubElement(cProgramme, "date")
                 cDate.text = year[0]
 
+            json_data=open("categories.json").read()
+            categories_map = json.loads(json_data)
+
+            if categories_map.get(category) is not None:
+                category = categories_map.get(category)
 
             cCategory = SubElement(cProgramme, "category", {"lang":"es"})
 
