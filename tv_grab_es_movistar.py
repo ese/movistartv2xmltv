@@ -100,7 +100,7 @@ else:
     # log to console
     if not args.quiet:
         ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
+        ch.setLevel(logging.ERROR)
         ch.setFormatter(formatter)
         logger.addHandler(ch)
 
