@@ -370,7 +370,7 @@ class TvaParser(object):
                 cDate = SubElement(cProgramme, "date")
                 cDate.text = year[0]
 
-            json_data=open("categories.json").read()
+            json_data=open(os.path.split(__file__)[0]+"/categories.json").read()
             categories_map = json.loads(json_data)
 
             if categories_map.get(category) is not None:
