@@ -142,8 +142,11 @@ else:
         config['tvpackages'] = clientprofile["tvPackages"].split("|")
         config['mcast_grp_start'] = platformprofile["dvbConfig"]["dvbEntryPoint"].split(":")[0]
         config['mcast_port'] = int(platformprofile["dvbConfig"]["dvbEntryPoint"].split(":")[1])
-        with open('tv_grab_es_movistar.config', 'w') as outfile:
-            json.dump(config, outfile)
+        try:
+            with open('tv_grab_es_movistar.config', 'w') as outfile:
+                json.dump(config, outfile)
+        except:
+            logger.info("Config file can not be saved") 
  
     logger.info("Init. DEM="+str(config['demarcation'])+" TVPACKS="+str(config['tvpackages'])+" ENTRY_MCAST="+str(config['mcast_grp_start'])+":"+str(config['mcast_port']))
 
