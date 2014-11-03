@@ -184,7 +184,7 @@ else:
     # If m3u arg create m3u and exit
     if args.m3u:
         clist = {}
-        for package in TVPACKAGES:
+        for package in config['tvpackages']:
             for channel in channelspackages[package].keys():
                 clist[channel] = rawclist[channel]
                 clist[channel]["order"] = channelspackages[package][channel]["order"]
