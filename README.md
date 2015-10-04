@@ -7,12 +7,12 @@ You need to *setup dns 172.26.23.3* to resolve internals urls.
 
 *Wired connection required*. UDP stream without any fix correction
 
-## Integration with xmltv-util
+## Integration with xmltv and xmltv-utils
 
-Install xmltv-util and add symbolic link to tv_grab_es_movistar.py in PATH
+Install xmltv and xmltv-utils and add symbolic link to tv_grab_es_movistar.py in PATH
 
 ```
-$ sudo apt-get install xmltv-util
+$ sudo apt-get install xmltv xmltv-util
 $ pwd
  /home/multimedia/source/movistartv2xmltv
 $ sudo ln -s /home/multimedia/source/movistartv2xmltv/tv_grab_es_movistar.py /usr/bin/
